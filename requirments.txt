@@ -1,0 +1,15 @@
+mlflow
+airflow
+scikit-learn
+sktime
+statsmodel
+scipy
+numpy
+pandas
+geopandas
+dask
+rasterio
+openeo
+matplotlib
+plotly
+seaborn
