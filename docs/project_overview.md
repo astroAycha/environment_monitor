@@ -67,12 +67,12 @@ such as vegetation, soil moisture, wildfire burn, surface water level
 
 ### Status
 
-| Pipeline Componetn | Step   | Status | Notes |
+| Pipeline Components | Step   | Status | Notes |
 | :---               | :---   | :---   | :---- |
 | Data Acquisition   | define AOI/POI | |2-3 AOI in syria during the 14 years war. Add another region in Ontario to see how the pipeline generalizes? How many AOIs? Check availability of data |
 | Data Acquisition   | indices to track (vegetation, soil, urban...) | | Keep it simple as a start. Add more later |
 | Data Acquisition   | feature selection/creation |  | Time series forecasting will require additional work on feature engineering |
-| Data Acquisition   | data selection and download | Rough code to extract indicies and time series | |
+| Data Acquisition   | data selection and download | Rough code to extract indices and time series | |
 | Data Acquisition   | data quality |  | log with mlflow, decide on actions in case of data issues (large gaps, change in dist, ...) | 
 | Analysis & Evaluation |... | ... | ... |
 | Analysis & Evaluation | | | |
