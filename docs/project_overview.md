@@ -64,6 +64,14 @@ such as vegetation, soil moisture, wildfire burn, surface water level
 - Stac, Dask, xarray, rasterio, geopandas, etc.
 - ....
 
+### Ref:
+- [War and Deforestation: Using Remote Sensing and Machine Learning to Identify the War-Induced Deforestation in Syria 2010–2019](https://www.mdpi.com/2073-445X/12/8/1509)
+
+- [Multisource Remote Sensing and Machine Learning for Spatio-Temporal Drought Assessment in Northeast Syria](https://www.mdpi.com/2071-1050/17/24/10933)
+
+- Designing Machine Learning Systems: An Iterative Process for Production-Ready Applications, Chip Huyen
+
+
 
 ### Status
 
