@@ -71,6 +71,8 @@ such as vegetation, soil moisture, wildfire burn, surface water level
 
 - Designing Machine Learning Systems: An Iterative Process for Production-Ready Applications, Chip Huyen
 
+- Software Engineering for Data Scientists, Catherine Nelson
+
 
 
 ### Status
