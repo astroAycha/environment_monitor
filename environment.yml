@@ -1,0 +1,25 @@
+name: geospatial_mlops_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - mlflow
+  - airflow
+  - scikit-learn
+  - sktime
+  - statsmodels
+  - scipy
+  - numpy
+  - pandas
+  - geopandas
+  - dask
+  - rasterio
+  - shapely
+  - odc-stac
+  - pystac_client
+  - openeo
+  - matplotlib
+  - plotly
+  - seaborn
+  - pytest
