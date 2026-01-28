@@ -136,4 +136,29 @@ class DataDownload():
         ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
        
+       # todo: save time series to file (parquet?)
         return ndvi_mean_ts
+
+
+        def update_time_series(self,
+                               last_date: str,
+                               ): 
+            """check the last date of existing time series
+            and update it with new data from the STAC catalog"""
+
+            # check the logged last date
+            # if it is older than today:
+            # check if there is new data to download
+            # if yes, download and append to existing time series
+
+            return NotImplemented
+        
+        def download_spatial_data(self,
+                                  aoi_bbox: tuple,
+                                  date: str):
+            """
+            download spatial data for a given date range and AOI.
+            should be grouped by month (or season).
+            """
+
+            return NotImplemented
