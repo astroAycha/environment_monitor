@@ -1,8 +1,28 @@
 import geopandas as gpd
+import pandas as pd
 from shapely.geometry import Point
 import pystac_client
 import odc.stac
 import numpy as np
+
+import os
+import logging
+
+log_file = 'data_download.log'
+log_dir = 'logs'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+log_path = os.path.join(log_dir, log_file)
+
+logging.basicConfig(
+    filename=log_path,
+    level=logging.INFO,
+    filemode='a')
+
+data_dir = 'data'
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
 
 
 class DataDownload():
@@ -62,7 +82,7 @@ class DataDownload():
 
 
     def extract_time_series(self,
-                            aoi_bbox: tuple,
+                            aoi_bbox: list,
                             start_date: str,
                             end_date: str):
         """"
@@ -136,8 +156,16 @@ class DataDownload():
         ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
        
-       # todo: save time series to file (parquet?)
-        return ndvi_mean_ts
+        #save time series to file
+        ndvi_df = pd.DataFrame({
+            'time': ndvi_mean_ts.time.values,
+            'ndvi': ndvi_mean_ts.data
+            })
+       
+        ndvi_df.to_parquet(f'{data_dir}/ndvi_time_series.parquet', 
+                           engine="pyarrow", index=False)
+    
+        return ndvi_df
 
 
         def update_time_series(self,
