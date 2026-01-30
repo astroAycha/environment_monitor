@@ -162,6 +162,11 @@ class DataDownload():
             'ndvi': ndvi_mean_ts.data
             })
        
+        # TODO: update logging info to include more details on indices
+        logging.info(f"NDVI time series has {ndvi_df.shape[0]} records \
+                    from {ndvi_df['time'].min()} to {ndvi_df['time'].max()}")
+        logging.info(f"Time series includes {ndvi_df['ndvi'].isna().sum()} missing values")
+        
         ndvi_df.to_parquet(f'{data_dir}/ndvi_time_series.parquet', 
                            engine="pyarrow", index=False)
     
