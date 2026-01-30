@@ -133,7 +133,9 @@ class DataDownload():
         ds = ds.where(ds != 0)
 
         red = ds['red']
+        blue = ds['blue']
         nir = ds['nir']
+        swir = ds['swir16']
         scl = ds['scl']
 
         mask = scl.isin([
@@ -145,7 +147,9 @@ class DataDownload():
                     ])
 
         red_masked = red.where(~mask)
+        blue_masked = blue.where(~mask)
         nir_masked = nir.where(~mask)
+        swir_masked = swir.where(~mask)
 
         ndvi = (nir_masked - red_masked) / (nir_masked + red_masked)
 
@@ -156,21 +160,34 @@ class DataDownload():
         ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
        
-        #save time series to file
-        ndvi_df = pd.DataFrame({
-            'time': ndvi_mean_ts.time.values,
-            'ndvi': ndvi_mean_ts.data
-            })
-       
-        # TODO: update logging info to include more details on indices
-        logging.info(f"NDVI time series has {ndvi_df.shape[0]} records \
-                    from {ndvi_df['time'].min()} to {ndvi_df['time'].max()}")
-        logging.info(f"Time series includes {ndvi_df['ndvi'].isna().sum()} missing values")
+        # Bare Soil Index (BI)
+        bi = ((swir_masked + red_masked) - (nir_masked + blue_masked)) / \
+              ((swir_masked + red_masked) + (nir_masked + blue_masked))
         
-        ndvi_df.to_parquet(f'{data_dir}/ndvi_time_series.parquet', 
+        bi_mean_ts = bi.mean(dim=['x', 'y']).interp(method='nearest')
+        bi_mean_ts = bi_mean_ts.compute(scheduler="threads",
+                                        num_workers=4)
+
+        #save time series to file
+        indices_df = pd.DataFrame({
+            'time': ndvi_mean_ts.time.values,
+            'ndvi': ndvi_mean_ts.data,
+            'bi': bi_mean_ts.data
+            })
+        indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
+                           engine="pyarrow", index=False)
+        
+        # TODO: update logging info to include more details on indices
+        # consider creating a table instead of plain text log
+        logging.info(f"DATE RANGE: ({indices_df['time'].min()}, {indices_df['time'].max()})")
+        logging.info(f"NDVI: {indices_df.shape[0]} records")
+        logging.info(f"BI: {indices_df.shape[0]} records")
+        logging.info(f"MISSING VALUES: {indices_df['ndvi'].isna().sum()}")
+        
+        indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
                            engine="pyarrow", index=False)
     
-        return ndvi_df
+        return indices_df
 
 
         def update_time_series(self,
