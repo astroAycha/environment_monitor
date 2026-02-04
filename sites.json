@@ -1,0 +1,13 @@
+{"atamah_camp": {"latitude": 36.310, 
+                "longitude": 36.688, 
+                "radius_meters": 4000, 
+                "tags": "refugee_camps"},
+"qastal_maaf": {"latitude": 34.358, 
+                "longitude": 35.952, 
+                "radius_meters": 3000, 
+                "tags": "wildfires"},
+"near_nuwa": {"latitude": 32.887,
+            "longitude": 36.102, 
+            "radius_meters": 4000, 
+            "tags": "soil_moisture"}
+            }
