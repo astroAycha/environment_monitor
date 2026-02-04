@@ -7,6 +7,7 @@ import numpy as np
 import os
 import logging
 import duckdb
+import datetime
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -100,7 +101,8 @@ class DataDownload():
     def extract_time_series(self,
                             aoi_bbox: list,
                             start_date: str,
-                            end_date: str):
+                            end_date: str,
+                            updated_existing: bool = False) -> pd.DataFrame:
         """"
         Extract time series from the downloaded data
 
@@ -207,29 +209,31 @@ class DataDownload():
         s3_path = f's3://{self.bucket_name}/{file_name}.parquet'
         indices_df.to_parquet(s3_path, index=False)
 
-
         return indices_df
                             
 
-        def update_time_series(self,
-                               last_date: str,
-                               ): 
-            """check the last date of existing time series
-            and update it with new data from the STAC catalog"""
+    def update_time_series(self):
+        """check the last date of existing time series
+        and update it with new data from the STAC catalog
+        """
 
-            # check the logged last date
-            # if it is older than today:
-            # check if there is new data to download
-            # if yes, download and append to existing time series
-
-            return NotImplemented
+        #FIXME: file_path, and aoi_bbox
+        today = datetime.date.today()
+        max_date = self.conn.execute(f"""SELECT MAX(time) 
+                            FROM read_parquet('s3://{self.bucket_name}/{file_path}');""").fetch()
         
-        def download_spatial_data(self,
-                                  aoi_bbox: tuple,
-                                  date: str):
-            """
-            download spatial data for a given date range and AOI.
-            should be grouped by month (or season).
-            """
+        if max_date < today:
+            new_data = self.extract_time_series(aoi_bbox,
+                                                start_date=max_date + datetime.timedelta(days=1),
+                                                end_date=today.strftime("%Y-%m-%d"))
 
-            return NotImplemented
+        
+    def download_spatial_data(self,
+                                aoi_bbox: tuple,
+                                date: str):
+        """
+        download spatial data for a given date range and AOI.
+        should be grouped by month (or season).
+        """
+
+        return NotImplemented
