@@ -1,6 +1,7 @@
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
+from shapely.geometry import box
 import pystac_client
 import odc.stac
 import numpy as np
@@ -193,8 +194,16 @@ class DataDownload():
             'bi': bi_mean_ts.data
             })
         
-        indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
-                           engine="pyarrow", index=False)
+        geom = box(*aoi_bbox)
+
+        geom_series = [geom for _ in range(len(indices_df))]
+
+        # 32637 or 32636
+        indices_gdf = gpd.GeoDataFrame(indices_df, geometry=geom_series, crs="EPSG:4326")
+        
+        # i probably don't need so save file on local disk
+        # indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
+        #                    engine="pyarrow", index=False)
         
         # TODO: update logging info to include more details on indices
         # consider creating a table instead of plain text log
@@ -207,7 +216,8 @@ class DataDownload():
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
         s3_path = f's3://{self.bucket_name}/{file_name}.parquet'
-        indices_df.to_parquet(s3_path, index=False)
+        indices_gdf.to_parquet(s3_path, index=False)
+        # TODO: look into adding metadata to the parquet file
 
         return indices_df
                             
