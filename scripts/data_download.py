@@ -103,7 +103,7 @@ class DataDownload():
                             aoi_bbox: list,
                             start_date: str,
                             end_date: str,
-                            updated_existing: bool = False) -> pd.DataFrame:
+                            update_existing: bool = False) -> pd.DataFrame:
         """"
         Extract time series from the downloaded data
 
@@ -222,22 +222,30 @@ class DataDownload():
         return indices_df
                             
 
-    def update_time_series(self):
+    def update_time_series(self,
+                           file_path: str):
         """check the last date of existing time series
         and update it with new data from the STAC catalog
         """
 
-        #FIXME: file_path, and aoi_bbox
         today = datetime.date.today()
         max_date = self.conn.execute(f"""SELECT MAX(time) 
-                            FROM read_parquet('s3://{self.bucket_name}/{file_path}');""").fetch()
+                            FROM read_parquet('s3://{self.bucket_name}/{file_path}');""").fetchall()
         
-        if max_date < today:
+        if max_date[0][0].date() < today:
+
+            aoi_bbox = self.conn.execute(f"""SELECT ST_EXTENT(geometry) AS bbox_area
+                                    FROM read_parquet('s3://{self.bucket_name}/{file_path}')
+                                    LIMIT 1;
+                                    """).fetchall()
+            
             new_data = self.extract_time_series(aoi_bbox,
                                                 start_date=max_date + datetime.timedelta(days=1),
-                                                end_date=today.strftime("%Y-%m-%d"))
+                                                end_date=today.strftime("%Y-%m-%d"),
+                                                update_existing=True)
 
-        
+            return new_data.shape
+
     def download_spatial_data(self,
                                 aoi_bbox: tuple,
                                 date: str):
