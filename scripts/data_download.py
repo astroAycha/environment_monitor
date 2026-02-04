@@ -4,9 +4,13 @@ from shapely.geometry import Point
 import pystac_client
 import odc.stac
 import numpy as np
-
 import os
 import logging
+import duckdb
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 
 log_file = 'data_download.log'
 log_dir = 'logs'
@@ -33,6 +37,18 @@ class DataDownload():
     def __init__(self):
         self.api_url = "https://earth-search.aws.element84.com/v1"
         self.collection_id = "sentinel-2-c1-l2a"
+
+        self.sec_access_key = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
+        self.acc_key_id = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
+        self.bucket_name = os.getenv("S3_BUCKET_NAME")
+        self.region = os.getenv("AWS_DEFAULT_REGION")
+        self.conn = duckdb.connect()
+
+        self.conn.execute("""
+        SET s3_region='us-east-1';
+        SET s3_access_key_id='{self.acc_key_id}';
+        SET s3_secret_access_key='{self.sec_access_key}';
+        """)
 
     def define_bbox(self, 
                     lat: float,
@@ -174,6 +190,7 @@ class DataDownload():
             'ndvi': ndvi_mean_ts.data,
             'bi': bi_mean_ts.data
             })
+        
         indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
                            engine="pyarrow", index=False)
         
@@ -184,11 +201,15 @@ class DataDownload():
         logging.info(f"BI: {indices_df.shape[0]} records")
         logging.info(f"MISSING VALUES: {indices_df['ndvi'].isna().sum()}")
         
-        indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
-                           engine="pyarrow", index=False)
-    
-        return indices_df
+        # write dataframe to s3 bucket
+        # this requires proper permissions to the bucket
+        file_name = f'indices_time_series_{start_date}_to_{end_date}'
+        s3_path = f's3://{self.bucket_name}/{file_name}.parquet'
+        indices_df.to_parquet(s3_path, index=False)
 
+
+        return indices_df
+                            
 
         def update_time_series(self,
                                last_date: str,
