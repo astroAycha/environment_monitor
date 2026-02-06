@@ -48,7 +48,7 @@ def test_bbox_bounds(lat, lon, rad):
     (-33.8688, 151.2093, 0) # Sydney
 
 ])
-def test_bbox_bounds(lat, lon, rad):
+def test_bbox_radius_error(lat, lon, rad):
     """
     Test that a ValueError is raised for non-positive radius values
     """
