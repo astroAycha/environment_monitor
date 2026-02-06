@@ -102,15 +102,14 @@ class DataDownload():
     def extract_time_series(self,
                             aoi_bbox: list,
                             start_date: str,
-                            end_date: str,
-                            update_existing: bool = False) -> gpd.GeoDataFrame:
+                            end_date: str) -> gpd.GeoDataFrame:
         """"
         Extract time series from the downloaded data
 
         Parameters
         ----------
-        aoi_bbox : tuple
-            Tuple of coordinates defining the bounding box
+        aoi_bbox : list
+            List of coordinates defining the bounding box
         start_date : str
             Start date of the time series in the format 'YYYY-MM-DD'
         end_date : str
@@ -259,14 +258,13 @@ class DataDownload():
             
             new_data = self.extract_time_series(aoi_bbox,
                                                 start_date=max_date[0][0] + datetime.timedelta(days=1),
-                                                end_date=today.strftime("%Y-%m-%d"),
-                                                update_existing=True)
+                                                end_date=today.strftime("%Y-%m-%d"))
 
             return new_data.shape
         
 
     def download_spatial_data(self,
-                                aoi_bbox: tuple,
+                                aoi_bbox: list,
                                 date: str):
         """
         download spatial data for a given date range and AOI.
