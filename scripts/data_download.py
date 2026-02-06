@@ -212,7 +212,9 @@ class DataDownload():
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
-        s3_path = f's3://{self.bucket_name}/{file_name}.parquet'
+        s3_data_dir = 'indices_time_series'
+        dir_path = os.path.join(s3_data_dir, file_name)
+        s3_path = f's3://{self.bucket_name}/{dir_path}.parquet'
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
 
