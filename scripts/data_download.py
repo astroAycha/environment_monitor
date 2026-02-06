@@ -204,13 +204,13 @@ class DataDownload():
         
         # TODO: update logging info to include more details on indices
         # consider creating a table instead of plain text log
-        logging.info(f"{datetime.date.today().strftime("%Y-%m-%d")}")
-        logging.info(f"Extracted time series for AOI: {aoi_bbox}")
-        logging.info(f"DATE RANGE: ({indices_df['time'].min()}, {indices_df['time'].max()})")
-        logging.info(f"NDVI: {indices_df.shape[0]} records")
-        logging.info(f"BI: {indices_df.shape[0]} records")
-        logging.info(f"NDVI MISSING VALUES: {indices_df['ndvi'].isna().sum()}")
-        logging.info(f"BI MISSING VALUES: {indices_df['bi'].isna().sum()}")
+        logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
+        logging.info("Extracted time series for AOI: %s", aoi_bbox)
+        logging.info("DATE RANGE: (%s, %s)", indices_df['time'].min(), indices_df['time'].max())
+        logging.info("NDVI: %s records", indices_df.shape[0])
+        logging.info("BI: %s records", indices_df.shape[0])
+        logging.info("NDVI MISSING VALUES: %s", indices_df['ndvi'].isna().sum())
+        logging.info("BI MISSING VALUES: %s", indices_df['bi'].isna().sum())
         
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
@@ -234,22 +234,11 @@ class DataDownload():
         parquet file in the S3 bucket. 
         The original parquet file will not be updated. 
         A new file with fresh data will be created and stored in the same bucket.
-
-        Returns
-        -------
-        shape of the new data added to the time series
         """
 
         conn = duckdb.connect()
         conn.execute("LOAD spatial;")
-        # conn.execute(f"""
-        # SET s3_region='us-east-1';
-        # SET s3_access_key_id='{self.acc_key_id}';
-        # SET s3_secret_access_key='{self.sec_access_key}';
-        # """)
 
-
-        # conn.execute("LOAD spatial;")
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
         s3_data_dir = 'indices_time_series'
@@ -274,13 +263,13 @@ class DataDownload():
                                                 start_date=(max_date[0] + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
                                                 end_date=today.strftime("%Y-%m-%d"))
             
-            logging.info(f"{datetime.date.today().strftime("%Y-%m-%d")}")
-            logging.info(f"Updating time series for AOI: {target_aoi_bbox}")
-            logging.info(f"DATE RANGE: ({new_data['time'].min()}, {new_data['time'].max()})")
-            logging.info(f"NDVI: {new_data.shape[0]} records")
-            logging.info(f"BI: {new_data.shape[0]} records")
-            logging.info(f"NDVI MISSING VALUES: {new_data['ndvi'].isna().sum()}")
-            logging.info(f"BI MISSING VALUES: {new_data['bi'].isna().sum()}")
+            logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
+            logging.info("Updating time series for AOI: %s", target_aoi_bbox)
+            logging.info("DATE RANGE: (%s, %s)", new_data['time'].min(), new_data['time'].max())
+            logging.info("NDVI: %s records", new_data.shape[0])
+            logging.info("BI: %s records", new_data.shape[0])
+            logging.info("NDVI MISSING VALUES: %s", new_data['ndvi'].isna().sum())
+            logging.info("BI MISSING VALUES: %s", new_data['bi'].isna().sum())
 
             return 
         
