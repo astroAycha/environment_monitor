@@ -1,4 +1,5 @@
 from data_download import DataDownload
+import geopandas as gpd
 import pytest
 
 
@@ -57,22 +58,21 @@ def test_bbox_radius_error(lat, lon, rad):
         downloader.define_bbox(lat, lon, rad)
 
 
-def test_time_series_dim():
+def test_download_output():
     """
-    Test that the extracted time series has has only 1 dimension
-    """
-    downloader = DataDownload()
-    bbox = downloader.define_bbox(33.5138, 36.2765, 100)
-    ts = downloader.extract_time_series(bbox, "2024-01-01", "2024-02-01")
-    assert ts.ndim == 1  
-
-
-def test_time_series_has_time_dim():
-    """
-    Test that the extracted time series has a 'time' dimension
+    Test that the download function returns a geopandas df
     """
     downloader = DataDownload()
     bbox = downloader.define_bbox(33.5138, 36.2765, 100)
-    ts = downloader.extract_time_series(bbox, "2024-01-01", "2024-02-01")
-    assert 'time' in ts.dims
+    ts_gdf = downloader.extract_time_series(bbox, "2024-01-01", "2024-02-01")
+    assert isinstance(ts_gdf, gpd.GeoDataFrame)
 
+
+def test_download_has_time_column():
+    """
+    Test that the downloaded dataframe has a datetime column
+    """
+    downloader = DataDownload()
+    bbox = downloader.define_bbox(33.5138, 36.2765, 100)
+    ts_gdf = downloader.extract_time_series(bbox, "2024-01-01", "2024-02-01")
+    assert ts_gdf['time'].dtype == 'datetime64[ns]'
