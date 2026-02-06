@@ -1,6 +1,8 @@
 from data_download import DataDownload
 import geopandas as gpd
 import pytest
+import datetime
+import pandas as pd
 
 
 @pytest.mark.parametrize("lat, lon, rad", [
