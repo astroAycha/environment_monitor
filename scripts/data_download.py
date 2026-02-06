@@ -44,9 +44,10 @@ class DataDownload():
         self.acc_key_id = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
         self.region = os.getenv("AWS_DEFAULT_REGION")
+
         self.conn = duckdb.connect()
 
-        self.conn.execute("""
+        self.conn.execute(f"""
         SET s3_region='us-east-1';
         SET s3_access_key_id='{self.acc_key_id}';
         SET s3_secret_access_key='{self.sec_access_key}';
@@ -203,10 +204,13 @@ class DataDownload():
         
         # TODO: update logging info to include more details on indices
         # consider creating a table instead of plain text log
+        logging.info(f"{datetime.date.today().strftime("%Y-%m-%d")}")
+        logging.info(f"Extracted time series for AOI: {aoi_bbox}")
         logging.info(f"DATE RANGE: ({indices_df['time'].min()}, {indices_df['time'].max()})")
         logging.info(f"NDVI: {indices_df.shape[0]} records")
         logging.info(f"BI: {indices_df.shape[0]} records")
-        logging.info(f"MISSING VALUES: {indices_df['ndvi'].isna().sum()}")
+        logging.info(f"NDVI MISSING VALUES: {indices_df['ndvi'].isna().sum()}")
+        logging.info(f"BI MISSING VALUES: {indices_df['bi'].isna().sum()}")
         
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
@@ -235,32 +239,50 @@ class DataDownload():
         -------
         shape of the new data added to the time series
         """
+
+        conn = duckdb.connect()
+        conn.execute("LOAD spatial;")
+        # conn.execute(f"""
+        # SET s3_region='us-east-1';
+        # SET s3_access_key_id='{self.acc_key_id}';
+        # SET s3_secret_access_key='{self.sec_access_key}';
+        # """)
+
+
+        # conn.execute("LOAD spatial;")
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
         s3_data_dir = 'indices_time_series'
         today = datetime.date.today()
-        max_date = self.conn.execute(f"""SELECT MAX(time) 
-                            FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet');""").fetchone()
-        
+        max_date = conn.execute(f"""SELECT MAX(time) 
+                                    FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet');""").fetchone()
+
         # if it turns out the max date in the existing data is less than today,
         # then we need to update the data
-        if max_date[0][0].date() < today:
-            
-            # file to write the new data
-            dir_path = os.path.join(s3_data_dir, "update_" + today.strftime("%Y-%m-%d"))
+        if max_date[0].date() < today:
 
             # get the bbox of the AOI from the existing data 
             # and use it to extract new data from the STAC catalog
-            aoi_bbox = self.conn.execute(f"""SELECT ST_EXTENT(geometry) AS bbox_area
-                                    FROM read_parquet('s3://{self.bucket_name}/{dir_path}.parquet')
+            aoi_bbox = conn.execute(f"""SELECT ST_EXTENT(geometry) AS bbox_area
+                                    FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet')
                                     LIMIT 1;
                                     """).fetchone()
             
-            new_data = self.extract_time_series(aoi_bbox,
-                                                start_date=max_date[0][0] + datetime.timedelta(days=1),
-                                                end_date=today.strftime("%Y-%m-%d"))
+            target_aoi_bbox = [aoi_bbox[0]['min_x'], aoi_bbox[0]['min_y'], aoi_bbox[0]['max_x'], aoi_bbox[0]['max_y']]
 
-            return new_data.shape
+            new_data = self.extract_time_series(target_aoi_bbox,
+                                                start_date=(max_date[0] + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
+                                                end_date=today.strftime("%Y-%m-%d"))
+            
+            logging.info(f"{datetime.date.today().strftime("%Y-%m-%d")}")
+            logging.info(f"Updating time series for AOI: {target_aoi_bbox}")
+            logging.info(f"DATE RANGE: ({new_data['time'].min()}, {new_data['time'].max()})")
+            logging.info(f"NDVI: {new_data.shape[0]} records")
+            logging.info(f"BI: {new_data.shape[0]} records")
+            logging.info(f"NDVI MISSING VALUES: {new_data['ndvi'].isna().sum()}")
+            logging.info(f"BI MISSING VALUES: {new_data['bi'].isna().sum()}")
+
+            return 
         
 
     def download_spatial_data(self,
