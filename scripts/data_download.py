@@ -222,29 +222,48 @@ class DataDownload():
         return indices_gdf
                             
 
-    def update_time_series(self,
-                           file_path: str):
-        """check the last date of existing time series
-        and update it with new data from the STAC catalog
+    def update_time_series(self):
         """
+        check the last date of existing time series
+        and update it with new data from the STAC catalog
+        
+        This function assumes that the time series is stored in a 
+        parquet file in the S3 bucket. 
+        The original parquet file will not be updated. 
+        A new file with fresh data will be created and stored in the same bucket.
 
+        Returns
+        -------
+        shape of the new data added to the time series
+        """
+        # first check the last date of the existing time series
+        # use a wildcard to read all parquet files in the directory and get the max date
+        s3_data_dir = 'indices_time_series'
         today = datetime.date.today()
         max_date = self.conn.execute(f"""SELECT MAX(time) 
-                            FROM read_parquet('s3://{self.bucket_name}/{file_path}');""").fetchall()
+                            FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet');""").fetchone()
         
+        # if it turns out the max date in the existing data is less than today,
+        # then we need to update the data
         if max_date[0][0].date() < today:
+            
+            # file to write the new data
+            dir_path = os.path.join(s3_data_dir, "update_" + today.strftime("%Y-%m-%d"))
 
+            # get the bbox of the AOI from the existing data 
+            # and use it to extract new data from the STAC catalog
             aoi_bbox = self.conn.execute(f"""SELECT ST_EXTENT(geometry) AS bbox_area
-                                    FROM read_parquet('s3://{self.bucket_name}/{file_path}')
+                                    FROM read_parquet('s3://{self.bucket_name}/{dir_path}.parquet')
                                     LIMIT 1;
-                                    """).fetchall()
+                                    """).fetchone()
             
             new_data = self.extract_time_series(aoi_bbox,
-                                                start_date=max_date + datetime.timedelta(days=1),
+                                                start_date=max_date[0][0] + datetime.timedelta(days=1),
                                                 end_date=today.strftime("%Y-%m-%d"),
                                                 update_existing=True)
 
             return new_data.shape
+        
 
     def download_spatial_data(self,
                                 aoi_bbox: tuple,
@@ -255,3 +274,5 @@ class DataDownload():
         """
 
         return NotImplemented
+    
+    
