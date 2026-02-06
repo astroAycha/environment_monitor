@@ -103,7 +103,7 @@ class DataDownload():
                             aoi_bbox: list,
                             start_date: str,
                             end_date: str,
-                            update_existing: bool = False) -> pd.DataFrame:
+                            update_existing: bool = False) -> gpd.GeoDataFrame:
         """"
         Extract time series from the downloaded data
 
@@ -117,16 +117,15 @@ class DataDownload():
             End date of the time series in the format 'YYYY-MM-DD'
         Returns
         -------
-        ndvi_mean_ts : xarray.DataArray
-            NDVI time series at the specified location
+        geopandas dataframe with the datetime, indices, and geometry
         
         Example
         --------
         >>> downloader = DataDownload()
         >>> bbox = downloader.define_bbox(33.5138, 36.2765, 100)
-        >>> ts = downloader.extract_time_series(bbox, 
-                                                "2024-01-01", 
-                                                "2024-02-01")
+        >>> ts_gdp = downloader.extract_time_series(bbox, 
+                                                    "2024-01-01", 
+                                                    "2024-02-01")
         """
 
         client = pystac_client.Client.open(self.api_url)
@@ -187,23 +186,21 @@ class DataDownload():
         bi_mean_ts = bi_mean_ts.compute(scheduler="threads",
                                         num_workers=4)
 
-        #save time series to file
+        # put indices time series in a dataframe
         indices_df = pd.DataFrame({
             'time': ndvi_mean_ts.time.values,
             'ndvi': ndvi_mean_ts.data,
             'bi': bi_mean_ts.data
             })
         
+        # create geometry series for the geopandas df
         geom = box(*aoi_bbox)
-
         geom_series = [geom for _ in range(len(indices_df))]
 
-        # 32637 or 32636
+        # put everything in a geopandas df
+        # EPSG for Syria 32637 or 32636 but here we use WGS84
         indices_gdf = gpd.GeoDataFrame(indices_df, geometry=geom_series, crs="EPSG:4326")
-        
-        # i probably don't need so save file on local disk
-        # indices_df.to_parquet(f'{data_dir}/indices_time_series.parquet', 
-        #                    engine="pyarrow", index=False)
+    
         
         # TODO: update logging info to include more details on indices
         # consider creating a table instead of plain text log
@@ -219,7 +216,8 @@ class DataDownload():
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
 
-        return indices_df
+        # return geopandas df 
+        return indices_gdf
                             
 
     def update_time_series(self,
