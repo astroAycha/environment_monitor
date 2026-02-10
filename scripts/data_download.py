@@ -176,7 +176,7 @@ class DataDownload():
 
         # TODO: add more indices 
 
-        ndvi_mean_ts = ndvi.mean(dim=['x', 'y']).interp(method='nearest')
+        ndvi_mean_ts = ndvi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
 
         ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
@@ -185,7 +185,7 @@ class DataDownload():
         bi = ((swir_masked + red_masked) - (nir_masked + blue_masked)) / \
               ((swir_masked + red_masked) + (nir_masked + blue_masked))
         
-        bi_mean_ts = bi.mean(dim=['x', 'y']).interp(method='nearest')
+        bi_mean_ts = bi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
         bi_mean_ts = bi_mean_ts.compute(scheduler="threads",
                                         num_workers=4)
 
