@@ -35,9 +35,9 @@ class DataDownload():
     Search the STAC catalog and download data as time series
     """
 
-    def __init__(self):
-        self.api_url = "https://earth-search.aws.element84.com/v1"
-        self.collection_id = "sentinel-2-c1-l2a"
+    def __init__(self, collection_id: str = "sentinel-2-c1-l2a"):
+        self.api_url = os.getenv("STAC_API_URL")
+        self.collection_id = collection_id
 
         self.sec_access_key = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
         self.acc_key_id = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
