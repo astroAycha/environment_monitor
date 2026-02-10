@@ -29,10 +29,6 @@ logging.basicConfig(
     level=logging.INFO,
     filemode='a')
 
-data_dir = 'data'
-if not os.path.exists(data_dir):
-    os.makedirs(data_dir)
-
 
 class DataDownload():
     """
