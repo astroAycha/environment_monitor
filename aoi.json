@@ -1,0 +1,35 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [36.688, 36.310]
+        },
+        "properties": {
+            "name": "atamah_camp",
+            "application": "refugee_camps",
+            "buffer_meters": 4000
+    }},
+        {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [35.952, 34.358]
+        },
+        "properties": {
+            "name": "qastal_maaf",
+            "application": "wildfires",
+            "buffer_meters": 3000
+    }},
+        {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [36.102, 32.887]
+        },
+        "properties": {
+            "name": "near_nuwa",
+            "application": "soil_moisture",
+            "buffer_meters": 4000
+    }} 
+    ]
+}

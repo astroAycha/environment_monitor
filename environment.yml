@@ -12,12 +12,13 @@ dependencies:
   - scipy
   - numpy
   - pandas
+  - pyarrow
   - geopandas
   - dask
   - rasterio
   - shapely
   - odc-stac
-  - pystac_client
+  - pystac-client
   - openeo
   - matplotlib
   - plotly
