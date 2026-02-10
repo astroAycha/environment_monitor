@@ -1,16 +1,19 @@
+"""
+Scripts to download data from the STAC catalog 
+and extract time series of indices for a given AOI and date range
+"""
+import os
+import logging
+import datetime
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
 from shapely.geometry import box
 import pystac_client
 import odc.stac
-import numpy as np
-import os
-import logging
 import duckdb
-import datetime
 from dotenv import load_dotenv
-import os
+
 load_dotenv()
 
 
