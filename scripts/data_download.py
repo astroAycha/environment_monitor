@@ -263,16 +263,3 @@ class DataDownload():
             logging.info("BI MISSING VALUES: %s", new_data['bi'].isna().sum())
 
             return 
-        
-
-    def download_spatial_data(self,
-                                aoi_bbox: list,
-                                date: str):
-        """
-        download spatial data for a given date range and AOI.
-        should be grouped by month (or season).
-        """
-
-        return NotImplemented
-    
-    
