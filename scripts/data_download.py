@@ -36,21 +36,13 @@ class DataDownload():
     """
 
     def __init__(self, collection_id: str = "sentinel-2-c1-l2a"):
+
         self.api_url = os.getenv("STAC_API_URL")
         self.collection_id = collection_id
 
-        self.sec_access_key = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
-        self.acc_key_id = os.getenv("AWS_DEV_AT_ACCESS_KEY_ID")
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
-        self.region = os.getenv("AWS_DEFAULT_REGION")
 
         self.conn = duckdb.connect()
-
-        self.conn.execute(f"""
-        SET s3_region='us-east-1';
-        SET s3_access_key_id='{self.acc_key_id}';
-        SET s3_secret_access_key='{self.sec_access_key}';
-        """)
 
     def define_bbox(self, 
                     lat: float,
