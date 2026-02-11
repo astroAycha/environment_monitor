@@ -90,7 +90,43 @@ class DataDownload():
 
         return list(bbox)
 
+    def mask_invalid_data(self, ds):
+            """
+            Mask invalid data based on the Scene Classification Layer (SCL) values
+            
+            Parameters
+            ---------- 
+            ds : xarray.Dataset
+                Dataset containing the bands and the SCL layer
+            Returns
+            -------
+            red_masked, blue_masked, nir_masked, swir_masked : xarray.DataArray
+                Masked data arrays for the red, blue, nir, and swir bands
+            """
+            print("Masking invalid data based on SCL values...")
+            ds = ds.where(ds != 0)
 
+            red = ds['red']
+            blue = ds['blue']
+            nir = ds['nir']
+            swir = ds['swir16']
+            scl = ds['scl']
+
+            mask = scl.isin([
+                            3, # cloud_shadow
+                            6, # water
+                            8, # cloud_medium_probabability
+                            9, # cloud_high_probabability
+                            10 # thin_cirrus
+                        ])
+
+            red_masked = red.where(~mask)
+            blue_masked = blue.where(~mask)
+            nir_masked = nir.where(~mask)
+            swir_masked = swir.where(~mask)
+
+            return red_masked, blue_masked, nir_masked, swir_masked 
+        
     def extract_time_series(self,
                             aoi_bbox: list,
                             start_date: str,
@@ -138,27 +174,8 @@ class DataDownload():
                             resolution=20,
                             bbox=aoi_bbox
                         )
-        
-        ds = ds.where(ds != 0)
 
-        red = ds['red']
-        blue = ds['blue']
-        nir = ds['nir']
-        swir = ds['swir16']
-        scl = ds['scl']
-
-        mask = scl.isin([
-                        3, # cloud_shadow
-                        6, # water
-                        8, # cloud_medium_probabability
-                        9, # cloud_high_probabability
-                        10 # thin_cirrus
-                    ])
-
-        red_masked = red.where(~mask)
-        blue_masked = blue.where(~mask)
-        nir_masked = nir.where(~mask)
-        swir_masked = swir.where(~mask)
+        red_masked, blue_masked, nir_masked, swir_masked = self.mask_invalid_data(ds)
 
         ndvi = (nir_masked - red_masked) / (nir_masked + red_masked)
 
@@ -262,4 +279,4 @@ class DataDownload():
             logging.info("NDVI MISSING VALUES: %s", new_data['ndvi'].isna().sum())
             logging.info("BI MISSING VALUES: %s", new_data['bi'].isna().sum())
 
-            return 
+            return
