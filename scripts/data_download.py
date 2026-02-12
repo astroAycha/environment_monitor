@@ -110,7 +110,8 @@ class DataDownload():
             red = ds['red']
             blue = ds['blue']
             nir = ds['nir']
-            swir = ds['swir16']
+            swir1 = ds['swir16']
+            swir2 = ds['swir22']
             scl = ds['scl']
 
             mask = scl.isin([
@@ -124,9 +125,10 @@ class DataDownload():
             red_masked = red.where(~mask)
             blue_masked = blue.where(~mask)
             nir_masked = nir.where(~mask)
-            swir_masked = swir.where(~mask)
+            swir1_masked = swir1.where(~mask)
+            swir2_masked = swir2.where(~mask)
 
-            return red_masked, blue_masked, nir_masked, swir_masked 
+            return (red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked) 
     
     def extract_time_series(self,
                             aoi_bbox: list,
@@ -176,7 +178,7 @@ class DataDownload():
                             bbox=aoi_bbox
                         )
 
-        red_masked, blue_masked, nir_masked, swir_masked = self.mask_invalid_data(ds)
+        red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked = self.mask_invalid_data(ds)
 
         # get NDVI time series
         ndvi = SpectralIndices.calc_ndvi(nir_masked, red_masked)
@@ -187,17 +189,25 @@ class DataDownload():
                                             num_workers=4)
        
         # Bare Soil Index (BI)        
-        bi = SpectralIndices.calc_bi(swir_masked, red_masked, nir_masked, blue_masked)
+        bi = SpectralIndices.calc_bi(swir1_masked, red_masked, nir_masked, blue_masked)
         
         bi_mean_ts = bi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
         bi_mean_ts = bi_mean_ts.compute(scheduler="threads",
                                         num_workers=4)
+        
+        # Normalized Difference Moisture Index (NDMI)
+        ndmi = SpectralIndices.calc_ndmi(swir2_masked, nir_masked)
+        ndmi_mean_ts = ndmi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest')
+        ndmi_mean_ts = ndmi_mean_ts.compute(scheduler="threads",
+                                            num_workers=4)
+
 
         # put indices time series in a dataframe
         indices_df = pd.DataFrame({
             'time': ndvi_mean_ts.time.values,
             'ndvi': ndvi_mean_ts.data,
-            'bi': bi_mean_ts.data
+            'bi': bi_mean_ts.data,
+            'ndmi': ndmi_mean_ts.data
             })
         
         # create geometry series for the geopandas df
@@ -218,7 +228,7 @@ class DataDownload():
         logging.info("BI: %s records", indices_df.shape[0])
         logging.info("NDVI MISSING VALUES: %s", indices_df['ndvi'].isna().sum())
         logging.info("BI MISSING VALUES: %s", indices_df['bi'].isna().sum())
-        
+        logging.info("NDMI MISSING VALUES: %s", indices_df['ndmi'].isna().sum())
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
@@ -277,5 +287,6 @@ class DataDownload():
             logging.info("BI: %s records", new_data.shape[0])
             logging.info("NDVI MISSING VALUES: %s", new_data['ndvi'].isna().sum())
             logging.info("BI MISSING VALUES: %s", new_data['bi'].isna().sum())
+            logging.info("NDMI MISSING VALUES: %s", new_data['ndmi'].isna().sum())
 
             return
