@@ -127,8 +127,8 @@ class DataDownload():
             # mask unwanted data
             blue_masked = blue.where(~mask)
             red_masked = red.where(~mask)
-            rededge1_masked = rededge1(~mask)
-            rededge2_masked = rededge2(~mask)
+            rededge1_masked = rededge1.where(~mask)
+            rededge2_masked = rededge2.where(~mask)
             nir_masked = nir.where(~mask)
             swir1_masked = swir1.where(~mask)
             swir2_masked = swir2.where(~mask)
@@ -244,6 +244,7 @@ class DataDownload():
         logging.info("BSI MISSING VALUES: %s", indices_df['bsi'].isna().sum())
         logging.info("NDMI MISSING VALUES: %s", indices_df['ndmi'].isna().sum())
         logging.info("NBR MISSING VALUES: %s", indices_df['nbr'].isna().sum())
+
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
@@ -269,6 +270,11 @@ class DataDownload():
 
         conn = duckdb.connect()
         conn.execute("LOAD spatial;")
+        conn.execute("""CREATE SECRET (
+                        TYPE s3,
+                        PROVIDER credential_chain
+                        );
+                     """)
 
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
