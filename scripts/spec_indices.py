@@ -26,9 +26,9 @@ class SpectralIndices:
         return (nir - red) / (nir + red)
 
     @staticmethod
-    def calc_bi(swir, red, nir, blue):
+    def calc_bsi(swir, red, nir, blue):
         """
-        Calculate the Bare Soil Index (BI)
+        Calculate the Bare Soil Index (BSI)
         Parameters
         ----------
         swir : xarray.DataArray
@@ -41,10 +41,10 @@ class SpectralIndices:
             Blue band data array
         Returns
         -------
-        bi : xarray.DataArray
-            BI data array
+        bsi : xarray.DataArray
+            BSI data array
         """
-        print("Calculating Bare Soil Index (BI)...")
+        print("Calculating Bare Soil Index (BSI)...")
         return ((swir + red) - (nir + blue)) / ((swir + red) + (nir + blue))
     
     @staticmethod
@@ -66,3 +66,22 @@ class SpectralIndices:
         print("Calculating Normalized Difference Moisture Index (NDMI)...")
         return (nir - swir) / (nir + swir)
     
+    @staticmethod
+    def calc_nbr(swir, nir):
+        """
+        Calculate the Normalized Difference Moisture Index (NDMI)
+        (B08 - B12) / (B08 + B12)
+        Parameters
+        ----------
+        swir : xarray.DataArray
+            Short-wave infrared band data array
+        nir : xarray.DataArray
+            Near-infrared band data array
+
+        Returns
+        -------
+        ndmi : xarray.DataArray
+            NDMI data array
+        """
+        print("Calculating Normalized Difference Moisture Index (NDMI)...")
+        return (nir - swir) / (nir + swir)

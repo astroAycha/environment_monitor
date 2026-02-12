@@ -188,11 +188,11 @@ class DataDownload():
         ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
        
-        # Bare Soil Index (BI)        
-        bi = SpectralIndices.calc_bi(swir1_masked, red_masked, nir_masked, blue_masked)
+        # Bare Soil Index (BSI)        
+        bsi = SpectralIndices.calc_bsi(swir1_masked, red_masked, nir_masked, blue_masked)
         
-        bi_mean_ts = bi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
-        bi_mean_ts = bi_mean_ts.compute(scheduler="threads",
+        bsi_mean_ts = bsi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
+        bsi_mean_ts = bsi_mean_ts.compute(scheduler="threads",
                                         num_workers=4)
         
         # Normalized Difference Moisture Index (NDMI)
@@ -206,7 +206,7 @@ class DataDownload():
         indices_df = pd.DataFrame({
             'time': ndvi_mean_ts.time.values,
             'ndvi': ndvi_mean_ts.data,
-            'bi': bi_mean_ts.data,
+            'bsi': bsi_mean_ts.data,
             'ndmi': ndmi_mean_ts.data
             })
         
@@ -225,10 +225,11 @@ class DataDownload():
         logging.info("Extracted time series for AOI: %s", aoi_bbox)
         logging.info("DATE RANGE: (%s, %s)", indices_df['time'].min(), indices_df['time'].max())
         logging.info("NDVI: %s records", indices_df.shape[0])
-        logging.info("BI: %s records", indices_df.shape[0])
+        logging.info("BSI: %s records", indices_df.shape[0])
         logging.info("NDVI MISSING VALUES: %s", indices_df['ndvi'].isna().sum())
-        logging.info("BI MISSING VALUES: %s", indices_df['bi'].isna().sum())
+        logging.info("BSI MISSING VALUES: %s", indices_df['bsi'].isna().sum())
         logging.info("NDMI MISSING VALUES: %s", indices_df['ndmi'].isna().sum())
+
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
@@ -238,7 +239,6 @@ class DataDownload():
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
 
-        # return geopandas df 
         return indices_gdf
                             
 
@@ -284,9 +284,9 @@ class DataDownload():
             logging.info("Updating time series for AOI: %s", target_aoi_bbox)
             logging.info("DATE RANGE: (%s, %s)", new_data['time'].min(), new_data['time'].max())
             logging.info("NDVI: %s records", new_data.shape[0])
-            logging.info("BI: %s records", new_data.shape[0])
+            logging.info("BSI: %s records", new_data.shape[0])
             logging.info("NDVI MISSING VALUES: %s", new_data['ndvi'].isna().sum())
-            logging.info("BI MISSING VALUES: %s", new_data['bi'].isna().sum())
+            logging.info("BSI MISSING VALUES: %s", new_data['bsi'].isna().sum())
             logging.info("NDMI MISSING VALUES: %s", new_data['ndmi'].isna().sum())
 
             return
