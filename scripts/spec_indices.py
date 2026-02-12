@@ -86,3 +86,25 @@ class SpectralIndices:
         """
         print("Calculating Normalized Burn Ratio (NBR)...")
         return (nir - swir2) / (nir + swir2)
+    
+    @staticmethod
+    def calc_ndbi(rededge1, rededge2):
+        """
+        Calculate Normalized Difference Built-Up Index
+        (B06 - B05) / (B06 + B05)
+
+        Parameters
+        ----------
+        rededge1: xarray.DataArray
+            Short-wave infrared band data array SWIR 1
+        rededge2: xarray.DataArray
+            Short-wave infrared band data array SWIR 2
+
+        Returns
+        -------
+        ndbi : xarray.DataArray
+            NDBI data array
+        """
+
+        print("Calculating Normalized Difference Built-Up Index (NDBI)...")
+        return (rededge2 - rededge1) / (rededge2 + rededge1)

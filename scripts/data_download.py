@@ -107,11 +107,13 @@ class DataDownload():
             print("Masking invalid data based on SCL values...")
             ds = ds.where(ds != 0)
 
-            red = ds['red']
-            blue = ds['blue']
-            nir = ds['nir']
-            swir1 = ds['swir16']
-            swir2 = ds['swir22']
+            blue = ds['blue'] # B02
+            red = ds['red'] # B04
+            rededge1 = ds['rededge1'] # B05
+            rededge2 = ds['rededge2'] # B06
+            nir = ds['nir'] # Band 08
+            swir1 = ds['swir16'] # B11
+            swir2 = ds['swir22'] # B12
             scl = ds['scl']
 
             mask = scl.isin([
@@ -122,13 +124,18 @@ class DataDownload():
                             10 # thin_cirrus
                         ])
 
-            red_masked = red.where(~mask)
+            # mask unwanted data
             blue_masked = blue.where(~mask)
+            red_masked = red.where(~mask)
+            rededge1_masked = rededge1(~mask)
+            rededge2_masked = rededge2(~mask)
             nir_masked = nir.where(~mask)
             swir1_masked = swir1.where(~mask)
             swir2_masked = swir2.where(~mask)
 
-            return (red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked) 
+            return red_masked, blue_masked, nir_masked, \
+                    swir1_masked, swir2_masked, \
+                    rededge1_masked, rededge2_masked
     
     def extract_time_series(self,
                             aoi_bbox: list,
@@ -178,7 +185,7 @@ class DataDownload():
                             bbox=aoi_bbox
                         )
 
-        red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked = self.mask_invalid_data(ds)
+        red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked, rededge1_masked, rededge2_masked = self.mask_invalid_data(ds)
 
         # get NDVI time series
         ndvi = SpectralIndices.calc_ndvi(nir_masked, red_masked)
