@@ -196,18 +196,25 @@ class DataDownload():
                                         num_workers=4)
         
         # Normalized Difference Moisture Index (NDMI)
-        ndmi = SpectralIndices.calc_ndmi(swir2_masked, nir_masked)
+        ndmi = SpectralIndices.calc_ndmi(swir1_masked, nir_masked)
         ndmi_mean_ts = ndmi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest')
         ndmi_mean_ts = ndmi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
 
+
+        # Normalized Burn Ratio (NBR)
+        nbr = SpectralIndices.calc_nbr(swir2_masked, nir_masked)
+        nbr_mean_ts = nbr.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest')
+        nbr_mean_ts = nbr_mean_ts.compute(scheduler="threads",
+                                            num_workers=4)
 
         # put indices time series in a dataframe
         indices_df = pd.DataFrame({
             'time': ndvi_mean_ts.time.values,
             'ndvi': ndvi_mean_ts.data,
             'bsi': bsi_mean_ts.data,
-            'ndmi': ndmi_mean_ts.data
+            'ndmi': ndmi_mean_ts.data,
+            'nbr': nbr_mean_ts.data
             })
         
         # create geometry series for the geopandas df
@@ -229,7 +236,7 @@ class DataDownload():
         logging.info("NDVI MISSING VALUES: %s", indices_df['ndvi'].isna().sum())
         logging.info("BSI MISSING VALUES: %s", indices_df['bsi'].isna().sum())
         logging.info("NDMI MISSING VALUES: %s", indices_df['ndmi'].isna().sum())
-
+        logging.info("NBR MISSING VALUES: %s", indices_df['nbr'].isna().sum())
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
@@ -288,5 +295,6 @@ class DataDownload():
             logging.info("NDVI MISSING VALUES: %s", new_data['ndvi'].isna().sum())
             logging.info("BSI MISSING VALUES: %s", new_data['bsi'].isna().sum())
             logging.info("NDMI MISSING VALUES: %s", new_data['ndmi'].isna().sum())
+            logging.info("NBR MISSING VALUES: %s", new_data['nbr'].isna().sum())
 
             return

@@ -48,12 +48,13 @@ class SpectralIndices:
         return ((swir + red) - (nir + blue)) / ((swir + red) + (nir + blue))
     
     @staticmethod
-    def calc_ndmi(swir, nir):
+    def calc_ndmi(swir1, nir):
         """
         Calculate the Normalized Difference Moisture Index (NDMI)
+        (B08 - B11) / (B08 + B11)
         Parameters
         ----------
-        swir : xarray.DataArray
+        swir1 : xarray.DataArray
             Short-wave infrared band data array
         nir : xarray.DataArray
             Near-infrared band data array
@@ -64,24 +65,24 @@ class SpectralIndices:
             NDMI data array
         """
         print("Calculating Normalized Difference Moisture Index (NDMI)...")
-        return (nir - swir) / (nir + swir)
+        return (nir - swir1) / (nir + swir1)
     
     @staticmethod
-    def calc_nbr(swir, nir):
+    def calc_nbr(swir2, nir):
         """
-        Calculate the Normalized Difference Moisture Index (NDMI)
+        Calculate the Normalized Burn Ratio (NBR)
         (B08 - B12) / (B08 + B12)
         Parameters
         ----------
-        swir : xarray.DataArray
+        swir2 : xarray.DataArray
             Short-wave infrared band data array
         nir : xarray.DataArray
             Near-infrared band data array
 
         Returns
         -------
-        ndmi : xarray.DataArray
-            NDMI data array
+        nbr : xarray.DataArray
+            NBR data array
         """
-        print("Calculating Normalized Difference Moisture Index (NDMI)...")
-        return (nir - swir) / (nir + swir)
+        print("Calculating Normalized Burn Ratio (NBR)...")
+        return (nir - swir2) / (nir + swir2)
