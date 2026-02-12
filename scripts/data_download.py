@@ -13,6 +13,7 @@ import pystac_client
 import odc.stac
 import duckdb
 from dotenv import load_dotenv
+from scripts.spec_indices import SpectralIndices
 
 load_dotenv()
 
@@ -127,45 +128,6 @@ class DataDownload():
 
             return red_masked, blue_masked, nir_masked, swir_masked 
     
-    def calc_ndvi(self, nir, red):
-        """
-        Calculate the Normalized Difference Vegetation Index (NDVI)
-        
-        Parameters
-        ----------
-        nir : xarray.DataArray
-            Near-infrared band data array
-        red : xarray.DataArray
-            Red band data array
-        Returns
-        -------
-        ndvi : xarray.DataArray
-            NDVI data array
-        """
-        print("Calculating Normalized Difference Vegetation Index (NDVI)...")
-        return (nir - red) / (nir + red)
-
-    def calc_bi(self, swir, red, nir, blue):
-        """
-        Calculate the Bare Soil Index (BI)
-        Parameters
-        ----------
-        swir : xarray.DataArray
-            Short-wave infrared band data array
-        red : xarray.DataArray
-            Red band data array
-        nir : xarray.DataArray
-            Near-infrared band data array
-        blue : xarray.DataArray
-            Blue band data array
-        Returns
-        -------
-        bi : xarray.DataArray
-            BI data array
-        """
-        print("Calculating Bare Soil Index (BI)...")
-        return ((swir + red) - (nir + blue)) / ((swir + red) + (nir + blue))
-    
     def extract_time_series(self,
                             aoi_bbox: list,
                             start_date: str,
@@ -217,7 +179,7 @@ class DataDownload():
         red_masked, blue_masked, nir_masked, swir_masked = self.mask_invalid_data(ds)
 
         # get NDVI time series
-        ndvi = self.calc_ndvi(nir_masked, red_masked)
+        ndvi = SpectralIndices.calc_ndvi(nir_masked, red_masked)
 
         ndvi_mean_ts = ndvi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
 
@@ -225,7 +187,7 @@ class DataDownload():
                                             num_workers=4)
        
         # Bare Soil Index (BI)        
-        bi = self.calc_bi(swir_masked, red_masked, nir_masked, blue_masked)
+        bi = SpectralIndices.calc_bi(swir_masked, red_masked, nir_masked, blue_masked)
         
         bi_mean_ts = bi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
         bi_mean_ts = bi_mean_ts.compute(scheduler="threads",
