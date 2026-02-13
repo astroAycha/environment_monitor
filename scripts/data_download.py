@@ -139,6 +139,7 @@ class DataDownload():
     
     def extract_time_series(self,
                             aoi_bbox: list,
+                            aoi_name: str,
                             start_date: str,
                             end_date: str) -> gpd.GeoDataFrame:
         """"
@@ -148,6 +149,8 @@ class DataDownload():
         ----------
         aoi_bbox : list
             List of coordinates defining the bounding box
+        aoi_name : str
+            Name of the area of interest (AOI) for logging and file naming purposes
         start_date : str
             Start date of the time series in the format 'YYYY-MM-DD'
         end_date : str
@@ -161,6 +164,7 @@ class DataDownload():
         >>> downloader = DataDownload()
         >>> bbox = downloader.define_bbox(33.5138, 36.2765, 100)
         >>> ts_gdp = downloader.extract_time_series(bbox, 
+                                                    "Damascus",
                                                     "2024-01-01", 
                                                     "2024-02-01")
         """
@@ -236,7 +240,7 @@ class DataDownload():
         # TODO: update logging info to include more details on indices
         # consider creating a table instead of plain text log
         logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
-        logging.info("Extracted time series for AOI: %s", aoi_bbox)
+        logging.info("Extracted time series for AOI: %s, %s", aoi_name, aoi_bbox)
         logging.info("DATE RANGE: (%s, %s)", indices_df['time'].min(), indices_df['time'].max())
         logging.info("NDVI: %s records", indices_df.shape[0])
         logging.info("BSI: %s records", indices_df.shape[0])
@@ -248,7 +252,7 @@ class DataDownload():
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
-        s3_data_dir = 'indices_time_series'
+        s3_data_dir = aoi_name
         dir_path = os.path.join(s3_data_dir, file_name)
         s3_path = f's3://{self.bucket_name}/{dir_path}.parquet'
         indices_gdf.to_parquet(s3_path, index=False)
@@ -257,7 +261,7 @@ class DataDownload():
         return indices_gdf
                             
 
-    def update_time_series(self):
+    def update_time_series(self, aoi_name: str):
         """
         check the last date of existing time series
         and update it with new data from the STAC catalog
@@ -266,6 +270,12 @@ class DataDownload():
         parquet file in the S3 bucket. 
         The original parquet file will not be updated. 
         A new file with fresh data will be created and stored in the same bucket.
+
+        Parameters
+        ----------
+        aoi_name : str
+            Name of the area of interest (AOI) for logging and file naming purposes
+
         """
 
         conn = duckdb.connect()
@@ -278,7 +288,7 @@ class DataDownload():
 
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
-        s3_data_dir = 'indices_time_series'
+        s3_data_dir = aoi_name
         today = datetime.date.today()
         max_date = conn.execute(f"""SELECT MAX(time) 
                                     FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet');""").fetchone()
@@ -297,11 +307,12 @@ class DataDownload():
             target_aoi_bbox = [aoi_bbox[0]['min_x'], aoi_bbox[0]['min_y'], aoi_bbox[0]['max_x'], aoi_bbox[0]['max_y']]
 
             new_data = self.extract_time_series(target_aoi_bbox,
+                                                aoi_name=aoi_name,
                                                 start_date=(max_date[0] + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
                                                 end_date=today.strftime("%Y-%m-%d"))
             
             logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
-            logging.info("Updating time series for AOI: %s", target_aoi_bbox)
+            logging.info("Updating time series for AOI: %s, %s", aoi_name, target_aoi_bbox)
             logging.info("DATE RANGE: (%s, %s)", new_data['time'].min(), new_data['time'].max())
             logging.info("NDVI: %s records", new_data.shape[0])
             logging.info("BSI: %s records", new_data.shape[0])
