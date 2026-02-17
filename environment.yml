@@ -19,9 +19,11 @@ dependencies:
   - shapely
   - odc-stac
   - pystac-client
+  - pystac=1.11.0
   - openeo
   - matplotlib
   - plotly
   - seaborn
   - pytest
   - python-duckdb
+  - planetary_computer
