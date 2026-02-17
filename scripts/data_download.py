@@ -7,6 +7,7 @@ import logging
 import datetime
 import geopandas as gpd
 import pandas as pd
+import planetary_computer
 from shapely.geometry import Point
 from shapely.geometry import box
 import pystac_client
@@ -36,10 +37,17 @@ class DataDownload():
     Search the STAC catalog and download data as time series
     """
 
-    def __init__(self, collection_id: str = "sentinel-2-c1-l2a"):
+    def __init__(self, data_source: str):
 
-        self.api_url = os.getenv("STAC_API_URL")
-        self.collection_id = collection_id
+        self.data_source = data_source
+        if self.data_source == 'hls':
+            self.api_url = os.getenv("MPC_STAC_API_URL")
+            self.collection_id = ["hls2-s30", "hls2-l30"]
+
+        elif self.data_source == 'sentinel-2':
+            self.api_url = os.getenv("AWS_STAC_API_URL")
+            self.collection_id = "sentinel-2-l2a"
+        
 
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
 
@@ -91,7 +99,8 @@ class DataDownload():
 
         return list(bbox)
 
-    def mask_invalid_data(self, ds):
+    def mask_invalid_data(self, 
+                          ds: gpd.GeoDataFrame):
             """
             Mask invalid data based on the Scene Classification Layer (SCL) values
             
@@ -105,37 +114,54 @@ class DataDownload():
                 Masked data arrays for the red, blue, nir, and swir bands
             """
             print("Masking invalid data based on SCL values...")
+
             ds = ds.where(ds != 0)
 
-            blue = ds['blue'] # B02
-            red = ds['red'] # B04
-            rededge1 = ds['rededge1'] # B05
-            rededge2 = ds['rededge2'] # B06
-            nir = ds['nir'] # Band 08
-            swir1 = ds['swir16'] # B11
-            swir2 = ds['swir22'] # B12
-            scl = ds['scl']
+            if self.data_source == 'hls':
+                blue = ds['B02']
+                red = ds['B04']
+                nir = ds['B05']
+                swir1 = ds['B06']
+                swir2 = ds['B07']
+                scl = ds['Fmask']
+                
+                mask = scl.isin([
+                                0, # Cirrus
+                                1, # Cloud
+                                3, # Cloud shadow
+                                4, # Snow
+                                5, # Water
+                                # 6, # Aerosol
+                                # 7  # Aerosol
+                            ])
+                
+            elif self.data_source == 'sentinel-2':
+            
+                blue = ds['blue'] # B02
+                red = ds['red'] # B04
+                nir = ds['nir'] # Band 08
+                swir1 = ds['swir16'] # B11
+                swir2 = ds['swir22'] # B12
+                scl = ds['scl']
 
-            mask = scl.isin([
-                            3, # cloud_shadow
-                            6, # water
-                            8, # cloud_medium_probabability
-                            9, # cloud_high_probabability
-                            10 # thin_cirrus
-                        ])
+                mask = scl.isin([
+                                3, # cloud_shadow
+                                6, # water
+                                8, # cloud_medium_probabability
+                                9, # cloud_high_probabability
+                                10 # thin_cirrus
+                            ])
+            
 
             # mask unwanted data
             blue_masked = blue.where(~mask)
             red_masked = red.where(~mask)
-            rededge1_masked = rededge1.where(~mask)
-            rededge2_masked = rededge2.where(~mask)
             nir_masked = nir.where(~mask)
             swir1_masked = swir1.where(~mask)
             swir2_masked = swir2.where(~mask)
 
             return red_masked, blue_masked, nir_masked, \
-                    swir1_masked, swir2_masked, \
-                    rededge1_masked, rededge2_masked
+                    swir1_masked, swir2_masked
     
     def extract_time_series(self,
                             aoi_bbox: list,
@@ -169,32 +195,43 @@ class DataDownload():
                                                     "2024-02-01")
         """
 
-        client = pystac_client.Client.open(self.api_url)
+        if self.data_source == 'hls':
+            print(f"Extracting time series for AOI: {aoi_name}, {aoi_bbox} from HLS data...")
+            client = pystac_client.Client.open(self.api_url,
+                                                modifier=planetary_computer.sign_inplace)
+            dataset_bands = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'Fmask']
+        elif self.data_source == 'sentinel-2':
+            print(f"Extracting time series for AOI: {aoi_name}, {aoi_bbox} from Sentinel-2 data...")
+            client = pystac_client.Client.open(self.api_url)
+            dataset_bands = ['blue', 'red', 'nir', 'swir16', 'swir22', 'scl']
 
-        search = client.search(collections=[self.collection_id],
+        search = client.search(collections=self.collection_id,
                                 datetime=f"{start_date}/{end_date}",
-                                bbox=aoi_bbox
-                            )
+                                bbox=aoi_bbox)
         
         item_collection = search.item_collection()
+
+        print(f"Found {len(item_collection.items)} items in the STAC catalog for the given parameters.")
 
         if len(item_collection.items) == 0:
             raise ValueError("No data found for the given parameters.")
 
         ds = odc.stac.load(item_collection,
+                           bands=dataset_bands,
                             group_by="solar_day",
-                            chunks={'x': 50, 'y': 50},
+                            chunks={'x': 200, 'y': 200},
                             use_overviews=True,
                             resolution=20,
-                            bbox=aoi_bbox
-                        )
+                            bbox=aoi_bbox,
+                            # crs="epsg:22770"
+                            )
 
-        red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked, rededge1_masked, rededge2_masked = self.mask_invalid_data(ds)
-
+        red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked = self.mask_invalid_data(ds) 
+                                                                                        
         # get NDVI time series
         ndvi = SpectralIndices.calc_ndvi(nir_masked, red_masked)
 
-        ndvi_mean_ts = ndvi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
+        ndvi_mean_ts = ndvi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest') 
 
         ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
@@ -202,20 +239,20 @@ class DataDownload():
         # Bare Soil Index (BSI)        
         bsi = SpectralIndices.calc_bsi(swir1_masked, red_masked, nir_masked, blue_masked)
         
-        bsi_mean_ts = bsi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest') 
+        bsi_mean_ts = bsi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest') 
         bsi_mean_ts = bsi_mean_ts.compute(scheduler="threads",
                                         num_workers=4)
         
         # Normalized Difference Moisture Index (NDMI)
         ndmi = SpectralIndices.calc_ndmi(swir1_masked, nir_masked)
-        ndmi_mean_ts = ndmi.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest')
+        ndmi_mean_ts = ndmi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
         ndmi_mean_ts = ndmi_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
 
 
         # Normalized Burn Ratio (NBR)
         nbr = SpectralIndices.calc_nbr(swir2_masked, nir_masked)
-        nbr_mean_ts = nbr.groupby("time.month").mean(dim=['x', 'y']).interp(method='nearest')
+        nbr_mean_ts = nbr.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
         nbr_mean_ts = nbr_mean_ts.compute(scheduler="threads",
                                             num_workers=4)
 
