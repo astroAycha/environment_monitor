@@ -1,4 +1,6 @@
 """ Calculate spectral indices """
+import numpy as np
+import xarray as xr
 
 class SpectralIndices:
     """ Class for calculating spectral indices from satellite imagery """
@@ -23,7 +25,10 @@ class SpectralIndices:
             NDVI data array
         """
         print("Calculating Normalized Difference Vegetation Index (NDVI)...")
-        return (nir - red) / (nir + red)
+        # return (nir - red) / (nir + red)
+
+        denominator = nir + red
+        return xr.where(denominator != 0, (nir - red) / denominator, np.nan)
 
     @staticmethod
     def calc_bsi(swir, red, nir, blue):
@@ -45,7 +50,9 @@ class SpectralIndices:
             BSI data array
         """
         print("Calculating Bare Soil Index (BSI)...")
-        return ((swir + red) - (nir + blue)) / ((swir + red) + (nir + blue))
+        denominator = (swir + red) + (nir + blue)
+        return xr.where(denominator != 0, ((swir + red) - (nir + blue)) / denominator, np.nan)
+    
     
     @staticmethod
     def calc_ndmi(swir1, nir):
@@ -65,7 +72,8 @@ class SpectralIndices:
             NDMI data array
         """
         print("Calculating Normalized Difference Moisture Index (NDMI)...")
-        return (nir - swir1) / (nir + swir1)
+        denominator = nir + swir1
+        return xr.where(denominator != 0, (nir - swir1) / denominator, np.nan)
     
     @staticmethod
     def calc_nbr(swir2, nir):
@@ -85,7 +93,8 @@ class SpectralIndices:
             NBR data array
         """
         print("Calculating Normalized Burn Ratio (NBR)...")
-        return (nir - swir2) / (nir + swir2)
+        denominator = nir + swir2
+        return xr.where(denominator != 0, (nir - swir2) / denominator, np.nan)
     
     @staticmethod
     def calc_ndbi(rededge1, rededge2):
@@ -107,4 +116,5 @@ class SpectralIndices:
         """
 
         print("Calculating Normalized Difference Built-Up Index (NDBI)...")
-        return (rededge2 - rededge1) / (rededge2 + rededge1)
+        denominator = rededge2 + rededge1
+        return xr.where(denominator != 0, (rededge2 - rededge1) / denominator, np.nan)
