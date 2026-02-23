@@ -77,7 +77,7 @@ class DataDownload():
 
         Example
         --------
-        >>> downloader = DataDownload()
+        >>> downloader = DataDownload(data_source='sentinel-2')
         >>> bbox = downloader.define_bbox(33.5138, 36.2765, 100)
         """
 
@@ -189,7 +189,7 @@ class DataDownload():
         
         Example
         --------
-        >>> downloader = DataDownload()
+        >>> downloader = DataDownload(data_source='sentinel-2')
         >>> bbox = downloader.define_bbox(33.5138, 36.2765, 100)
         >>> ts_gdp = downloader.extract_time_series(bbox, 
                                                     "Damascus",
