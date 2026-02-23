@@ -5,6 +5,7 @@ and extract time series of indices for a given AOI and date range
 import os
 import logging
 import datetime
+import dask
 import geopandas as gpd
 import pandas as pd
 import planetary_computer
@@ -222,76 +223,76 @@ class DataDownload():
                             chunks={'x': 200, 'y': 200},
                             use_overviews=True,
                             resolution=20,
-                            bbox=aoi_bbox,
-                            # crs="epsg:22770"
+                            bbox=aoi_bbox
                             )
 
         red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked = self.mask_invalid_data(ds) 
-                                                                                        
+
+        spec_indices_ts = []                                                                                 
         # get NDVI time series
         ndvi = SpectralIndices.calc_ndvi(nir_masked, red_masked)
 
         ndvi_mean_ts = ndvi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest') 
+        spec_indices_ts.append(ndvi_mean_ts)
 
-        ndvi_mean_ts = ndvi_mean_ts.compute(scheduler="threads",
-                                            num_workers=4)
        
         # Bare Soil Index (BSI)        
         bsi = SpectralIndices.calc_bsi(swir1_masked, red_masked, nir_masked, blue_masked)
         
         bsi_mean_ts = bsi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest') 
-        bsi_mean_ts = bsi_mean_ts.compute(scheduler="threads",
-                                        num_workers=4)
+        spec_indices_ts.append(bsi_mean_ts)
         
         # Normalized Difference Moisture Index (NDMI)
         ndmi = SpectralIndices.calc_ndmi(swir1_masked, nir_masked)
         ndmi_mean_ts = ndmi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
-        ndmi_mean_ts = ndmi_mean_ts.compute(scheduler="threads",
-                                            num_workers=4)
+        spec_indices_ts.append(ndmi_mean_ts)
 
 
         # Normalized Burn Ratio (NBR)
         nbr = SpectralIndices.calc_nbr(swir2_masked, nir_masked)
         nbr_mean_ts = nbr.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
-        nbr_mean_ts = nbr_mean_ts.compute(scheduler="threads",
-                                            num_workers=4)
+        spec_indices_ts.append(nbr_mean_ts)
 
-        # put indices time series in a dataframe
-        indices_df = pd.DataFrame({
-            'time': ndvi_mean_ts.time.values,
-            'ndvi': ndvi_mean_ts.data,
-            'bsi': bsi_mean_ts.data,
-            'ndmi': ndmi_mean_ts.data,
-            'nbr': nbr_mean_ts.data
+        results = dask.compute(*spec_indices_ts, scheduler="threads", num_workers=4)
+
+        results_df= pd.DataFrame({
+            'time': results[0].time.values,
+            'ndvi': results[0].data,
+            'bsi': results[1].data,
+            'ndmi': results[2].data,
+            'nbr': results[3].data
             })
+        
+        # add a column for the AOI name
+        results_df['aoi_name'] = aoi_name
         
         # create geometry series for the geopandas df
         geom = box(*aoi_bbox)
-        geom_series = [geom for _ in range(len(indices_df))]
+        geom_series = [geom for _ in range(len(results_df))]
+
 
         # put everything in a geopandas df
         # EPSG for Syria 32637 or 32636 but here we use WGS84
-        indices_gdf = gpd.GeoDataFrame(indices_df, geometry=geom_series, crs="EPSG:4326")
+        indices_gdf = gpd.GeoDataFrame(results_df, geometry=geom_series, crs="EPSG:4326")
     
         
         # TODO: update logging info to include more details on indices
         # consider creating a table instead of plain text log
         logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
         logging.info("Extracted time series for AOI: %s, %s", aoi_name, aoi_bbox)
-        logging.info("DATE RANGE: (%s, %s)", indices_df['time'].min(), indices_df['time'].max())
-        logging.info("NDVI: %s records", indices_df.shape[0])
-        logging.info("BSI: %s records", indices_df.shape[0])
-        logging.info("NDVI MISSING VALUES: %s", indices_df['ndvi'].isna().sum())
-        logging.info("BSI MISSING VALUES: %s", indices_df['bsi'].isna().sum())
-        logging.info("NDMI MISSING VALUES: %s", indices_df['ndmi'].isna().sum())
-        logging.info("NBR MISSING VALUES: %s", indices_df['nbr'].isna().sum())
+        logging.info("DATE RANGE: (%s, %s)", indices_gdf['time'].min(), indices_gdf['time'].max())
+        logging.info("NDVI: %s records", indices_gdf.shape[0])
+        logging.info("BSI: %s records", indices_gdf.shape[0])
+        logging.info("NDVI MISSING VALUES: %s", indices_gdf['ndvi'].isna().sum())
+        logging.info("BSI MISSING VALUES: %s", indices_gdf['bsi'].isna().sum())
+        logging.info("NDMI MISSING VALUES: %s", indices_gdf['ndmi'].isna().sum())
+        logging.info("NBR MISSING VALUES: %s", indices_gdf['nbr'].isna().sum())
 
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
-        s3_data_dir = aoi_name
-        dir_path = os.path.join(s3_data_dir, file_name)
-        s3_path = f's3://{self.bucket_name}/{dir_path}.parquet'
+
+        s3_path = f's3://{self.bucket_name}/{file_name}.parquet'
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
 
@@ -325,10 +326,11 @@ class DataDownload():
 
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
-        s3_data_dir = aoi_name
+
         today = datetime.date.today()
         max_date = conn.execute(f"""SELECT MAX(time) 
-                                    FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet');""").fetchone()
+                                    FROM read_parquet('s3://{self.bucket_name}/*.parquet')
+                                    WHERE aoi_name = '{aoi_name}';""").fetchone()
 
         # if it turns out the max date in the existing data is less than today,
         # then we need to update the data
@@ -337,7 +339,8 @@ class DataDownload():
             # get the bbox of the AOI from the existing data 
             # and use it to extract new data from the STAC catalog
             aoi_bbox = conn.execute(f"""SELECT ST_EXTENT(geometry) AS bbox_area
-                                    FROM read_parquet('s3://{self.bucket_name}/{s3_data_dir}/*.parquet')
+                                    FROM read_parquet('s3://{self.bucket_name}/*.parquet')
+                                    WHERE aoi_name = '{aoi_name}'
                                     LIMIT 1;
                                     """).fetchone()
             
