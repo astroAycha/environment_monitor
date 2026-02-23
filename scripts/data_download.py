@@ -6,7 +6,6 @@ import os
 import logging
 import datetime
 import dask
-from fastapi import params
 import geopandas as gpd
 import pandas as pd
 import planetary_computer
@@ -16,6 +15,7 @@ import pystac_client
 import odc.stac
 import duckdb
 from dotenv import load_dotenv
+import xarray
 from scripts.spec_indices import SpectralIndices
 
 load_dotenv()
@@ -102,7 +102,7 @@ class DataDownload():
         return list(bbox)
 
     def mask_invalid_data(self, 
-                          ds: gpd.GeoDataFrame):
+                          ds: xarray.Dataset) -> tuple:
             """
             Mask invalid data based on the Scene Classification Layer (SCL) values
             
