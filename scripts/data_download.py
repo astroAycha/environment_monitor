@@ -103,68 +103,68 @@ class DataDownload():
 
     def mask_invalid_data(self, 
                           ds: xarray.Dataset) -> tuple:
-            """
-            Mask invalid data based on the Scene Classification Layer (SCL) values
+        """
+        Mask invalid data based on the Scene Classification Layer (SCL) values
+        
+        Parameters
+        ---------- 
+        ds : xarray.Dataset
+            Dataset containing the bands and the SCL layer
+        Returns
+        -------
+        red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked : xarray.DataArray
+            Masked data arrays for the red, blue, nir, and swir1, and swir2 bands
+        """
+        print("Masking invalid data based on SCL values...")
+
+        ds = ds.where(ds != 0)
+
+        if self.data_source == 'hls':
+            blue = ds['B02']
+            red = ds['B04']
+            nir = ds['B05']
+            swir1 = ds['B06']
+            swir2 = ds['B07']
+            scl = ds['Fmask']
             
-            Parameters
-            ---------- 
-            ds : xarray.Dataset
-                Dataset containing the bands and the SCL layer
-            Returns
-            -------
-            red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked : xarray.DataArray
-                Masked data arrays for the red, blue, nir, and swir1, and swir2 bands
-            """
-            print("Masking invalid data based on SCL values...")
-
-            ds = ds.where(ds != 0)
-
-            if self.data_source == 'hls':
-                blue = ds['B02']
-                red = ds['B04']
-                nir = ds['B05']
-                swir1 = ds['B06']
-                swir2 = ds['B07']
-                scl = ds['Fmask']
-                
-                mask = scl.isin([
-                                0, # Cirrus
-                                1, # Cloud
-                                3, # Cloud shadow
-                                4, # Snow
-                                5, # Water
-                                # 6, # Aerosol
-                                # 7  # Aerosol
-                            ])
-                
-            elif self.data_source == 'sentinel-2':
+            mask = scl.isin([
+                            0, # Cirrus
+                            1, # Cloud
+                            3, # Cloud shadow
+                            4, # Snow
+                            5, # Water
+                            # 6, # Aerosol
+                            # 7  # Aerosol
+                        ])
             
-                blue = ds['blue'] # B02
-                red = ds['red'] # B04
-                nir = ds['nir'] # Band 08
-                swir1 = ds['swir16'] # B11
-                swir2 = ds['swir22'] # B12
-                scl = ds['scl']
+        elif self.data_source == 'sentinel-2':
+        
+            blue = ds['blue'] # B02
+            red = ds['red'] # B04
+            nir = ds['nir'] # Band 08
+            swir1 = ds['swir16'] # B11
+            swir2 = ds['swir22'] # B12
+            scl = ds['scl']
 
-                mask = scl.isin([
-                                3, # cloud_shadow
-                                6, # water
-                                8, # cloud_medium_probabability
-                                9, # cloud_high_probabability
-                                10 # thin_cirrus
-                            ])
-            
+            mask = scl.isin([
+                            3, # cloud_shadow
+                            6, # water
+                            8, # cloud_medium_probabability
+                            9, # cloud_high_probabability
+                            10 # thin_cirrus
+                        ])
+        
 
-            # mask unwanted data
-            blue_masked = blue.where(~mask)
-            red_masked = red.where(~mask)
-            nir_masked = nir.where(~mask)
-            swir1_masked = swir1.where(~mask)
-            swir2_masked = swir2.where(~mask)
+        # mask unwanted data
+        blue_masked = blue.where(~mask)
+        red_masked = red.where(~mask)
+        nir_masked = nir.where(~mask)
+        swir1_masked = swir1.where(~mask)
+        swir2_masked = swir2.where(~mask)
 
-            return red_masked, blue_masked, nir_masked, \
-                    swir1_masked, swir2_masked
+        return red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked
     
+
     def extract_time_series(self,
                             aoi_bbox: list,
                             aoi_name: str,
@@ -280,22 +280,29 @@ class DataDownload():
         indices_gdf = gpd.GeoDataFrame(results_df, geometry=geom_series, crs="EPSG:4326")
     
         
-        # TODO: update logging info to include more details on indices
-        # consider creating a table instead of plain text log
+        # Create a logging table with index statistics
         logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
         logging.info("Extracted time series for AOI: %s, %s", aoi_name, aoi_bbox)
+        
+        # Create summary statistics dataframe
+        indices_summary = pd.DataFrame({
+            'Index': ['NDVI', 'BSI', 'NDMI', 'NBR'],
+            'Records': [indices_gdf.shape[0]] * 4,
+            'Missing Values': [
+            indices_gdf['ndvi'].isna().sum(),
+            indices_gdf['bsi'].isna().sum(),
+            indices_gdf['ndmi'].isna().sum(),
+            indices_gdf['nbr'].isna().sum()
+            ]
+        })
+        
         logging.info("DATE RANGE: (%s, %s)", indices_gdf['time'].min(), indices_gdf['time'].max())
-        logging.info("NDVI: %s records", indices_gdf.shape[0])
-        logging.info("BSI: %s records", indices_gdf.shape[0])
-        logging.info("NDVI MISSING VALUES: %s", indices_gdf['ndvi'].isna().sum())
-        logging.info("BSI MISSING VALUES: %s", indices_gdf['bsi'].isna().sum())
-        logging.info("NDMI MISSING VALUES: %s", indices_gdf['ndmi'].isna().sum())
-        logging.info("NBR MISSING VALUES: %s", indices_gdf['nbr'].isna().sum())
+        logging.info("\n%s", indices_summary.to_string(index=False))
 
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
-        dir_name = f"spectral_indices_ts"
+        dir_name = "spectral_indices_ts"
         s3_path = f's3://{self.bucket_name}/{dir_name}/{file_name}.parquet'
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
@@ -365,11 +372,19 @@ class DataDownload():
             logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
             logging.info("Updating time series for AOI: %s, %s", aoi_name, target_aoi_bbox)
             logging.info("DATE RANGE: (%s, %s)", new_data['time'].min(), new_data['time'].max())
-            logging.info("NDVI: %s records", new_data.shape[0])
-            logging.info("BSI: %s records", new_data.shape[0])
-            logging.info("NDVI MISSING VALUES: %s", new_data['ndvi'].isna().sum())
-            logging.info("BSI MISSING VALUES: %s", new_data['bsi'].isna().sum())
-            logging.info("NDMI MISSING VALUES: %s", new_data['ndmi'].isna().sum())
-            logging.info("NBR MISSING VALUES: %s", new_data['nbr'].isna().sum())
+            
+            # Create summary statistics dataframe
+            update_summary = pd.DataFrame({
+                'Index': ['NDVI', 'BSI', 'NDMI', 'NBR'],
+                'Records': [new_data.shape[0]] * 4,
+                'Missing Values': [
+                    new_data['ndvi'].isna().sum(),
+                    new_data['bsi'].isna().sum(),
+                    new_data['ndmi'].isna().sum(),
+                    new_data['nbr'].isna().sum()
+                ]
+            })
+            
+            logging.info("\n%s", update_summary.to_string(index=False))
 
             return
