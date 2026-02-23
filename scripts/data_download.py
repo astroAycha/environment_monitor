@@ -6,6 +6,7 @@ import os
 import logging
 import datetime
 import dask
+from fastapi import params
 import geopandas as gpd
 import pandas as pd
 import planetary_computer
@@ -111,8 +112,8 @@ class DataDownload():
                 Dataset containing the bands and the SCL layer
             Returns
             -------
-            red_masked, blue_masked, nir_masked, swir_masked : xarray.DataArray
-                Masked data arrays for the red, blue, nir, and swir bands
+            red_masked, blue_masked, nir_masked, swir1_masked, swir2_masked : xarray.DataArray
+                Masked data arrays for the red, blue, nir, and swir1, and swir2 bands
             """
             print("Masking invalid data based on SCL values...")
 
@@ -330,9 +331,9 @@ class DataDownload():
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
 
-
+        dir_name = 'spectral_indices_ts'
         today = datetime.date.today()
-        dir_name = f"spectral_indices_ts"
+
         max_date = conn.execute(f"""SELECT MAX(time) 
                                     FROM read_parquet('s3://{self.bucket_name}/{dir_name}/*.parquet')
                                     WHERE aoi_name = '{aoi_name}';""").fetchone()
