@@ -1,0 +1,120 @@
+""" Calculate spectral indices """
+import numpy as np
+import xarray as xr
+
+class SpectralIndices:
+    """ Class for calculating spectral indices from satellite imagery """
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def calc_ndvi(nir, red):
+        """
+        Calculate the Normalized Difference Vegetation Index (NDVI)
+        
+        Parameters
+        ----------
+        nir : xarray.DataArray
+            Near-infrared band data array
+        red : xarray.DataArray
+            Red band data array
+        Returns
+        -------
+        ndvi : xarray.DataArray
+            NDVI data array
+        """
+        print("Calculating Normalized Difference Vegetation Index (NDVI)...")
+        # return (nir - red) / (nir + red)
+
+        denominator = nir + red
+        return xr.where(denominator != 0, (nir - red) / denominator, np.nan)
+
+    @staticmethod
+    def calc_bsi(swir, red, nir, blue):
+        """
+        Calculate the Bare Soil Index (BSI)
+        Parameters
+        ----------
+        swir : xarray.DataArray
+            Short-wave infrared band data array
+        red : xarray.DataArray
+            Red band data array
+        nir : xarray.DataArray
+            Near-infrared band data array
+        blue : xarray.DataArray
+            Blue band data array
+        Returns
+        -------
+        bsi : xarray.DataArray
+            BSI data array
+        """
+        print("Calculating Bare Soil Index (BSI)...")
+        denominator = (swir + red) + (nir + blue)
+        return xr.where(denominator != 0, ((swir + red) - (nir + blue)) / denominator, np.nan)
+    
+    
+    @staticmethod
+    def calc_ndmi(swir1, nir):
+        """
+        Calculate the Normalized Difference Moisture Index (NDMI)
+        (B08 - B11) / (B08 + B11)
+        Parameters
+        ----------
+        swir1 : xarray.DataArray
+            Short-wave infrared band data array
+        nir : xarray.DataArray
+            Near-infrared band data array
+
+        Returns
+        -------
+        ndmi : xarray.DataArray
+            NDMI data array
+        """
+        print("Calculating Normalized Difference Moisture Index (NDMI)...")
+        denominator = nir + swir1
+        return xr.where(denominator != 0, (nir - swir1) / denominator, np.nan)
+    
+    @staticmethod
+    def calc_nbr(swir2, nir):
+        """
+        Calculate the Normalized Burn Ratio (NBR)
+        (B08 - B12) / (B08 + B12)
+        Parameters
+        ----------
+        swir2 : xarray.DataArray
+            Short-wave infrared band data array
+        nir : xarray.DataArray
+            Near-infrared band data array
+
+        Returns
+        -------
+        nbr : xarray.DataArray
+            NBR data array
+        """
+        print("Calculating Normalized Burn Ratio (NBR)...")
+        denominator = nir + swir2
+        return xr.where(denominator != 0, (nir - swir2) / denominator, np.nan)
+    
+    @staticmethod
+    def calc_ndbi(rededge1, rededge2):
+        """
+        Calculate Normalized Difference Built-Up Index
+        (B06 - B05) / (B06 + B05)
+
+        Parameters
+        ----------
+        rededge1: xarray.DataArray
+            Short-wave infrared band data array SWIR 1
+        rededge2: xarray.DataArray
+            Short-wave infrared band data array SWIR 2
+
+        Returns
+        -------
+        ndbi : xarray.DataArray
+            NDBI data array
+        """
+
+        print("Calculating Normalized Difference Built-Up Index (NDBI)...")
+        denominator = rededge2 + rededge1
+        return xr.where(denominator != 0, (rededge2 - rededge1) / denominator, np.nan)

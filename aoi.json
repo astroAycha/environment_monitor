@@ -14,7 +14,7 @@
         {"type": "Feature",
         "geometry": {
             "type": "Point",
-            "coordinates": [35.952, 34.358]
+            "coordinates": [35.952, 34.824]
         },
         "properties": {
             "name": "qastal_maaf",
