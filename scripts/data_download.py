@@ -170,7 +170,7 @@ class DataDownload():
                             aoi_name: str,
                             start_date: str,
                             end_date: str) -> gpd.GeoDataFrame:
-        """"
+        """
         Extract time series from the downloaded data
 
         Parameters
@@ -334,9 +334,14 @@ class DataDownload():
         dir_name = 'spectral_indices_ts'
         today = datetime.date.today()
 
-        max_date = conn.execute(f"""SELECT MAX(time) 
-                                    FROM read_parquet('s3://{self.bucket_name}/{dir_name}/*.parquet')
-                                    WHERE aoi_name = '{aoi_name}';""").fetchone()
+        try:
+            max_date = conn.execute(f"""SELECT MAX(time) 
+                                        FROM read_parquet('s3://{self.bucket_name}/{dir_name}/*.parquet')
+                                        WHERE aoi_name = '{aoi_name}';""").fetchone()
+        except Exception as e:
+            logging.error("Error reading existing time series data for AOI: %s. Error: %s", aoi_name, str(e))
+            raise ValueError(f"Error reading existing time series data for AOI: {aoi_name}. Error: {str(e)}") from e
+
 
         # if it turns out the max date in the existing data is less than today,
         # then we need to update the data
