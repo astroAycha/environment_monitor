@@ -291,8 +291,8 @@ class DataDownload():
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
-
-        s3_path = f's3://{self.bucket_name}/{file_name}.parquet'
+        dir_name = f"spectral_indices_ts"
+        s3_path = f's3://{self.bucket_name}/{dir_name}/{file_name}.parquet'
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
 
@@ -327,9 +327,11 @@ class DataDownload():
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
 
+
         today = datetime.date.today()
+        dir_name = f"spectral_indices_ts"
         max_date = conn.execute(f"""SELECT MAX(time) 
-                                    FROM read_parquet('s3://{self.bucket_name}/*.parquet')
+                                    FROM read_parquet('s3://{self.bucket_name}/{dir_name}/*.parquet')
                                     WHERE aoi_name = '{aoi_name}';""").fetchone()
 
         # if it turns out the max date in the existing data is less than today,
@@ -339,7 +341,7 @@ class DataDownload():
             # get the bbox of the AOI from the existing data 
             # and use it to extract new data from the STAC catalog
             aoi_bbox = conn.execute(f"""SELECT ST_EXTENT(geometry) AS bbox_area
-                                    FROM read_parquet('s3://{self.bucket_name}/*.parquet')
+                                    FROM read_parquet('s3://{self.bucket_name}/{dir_name}/*.parquet')
                                     WHERE aoi_name = '{aoi_name}'
                                     LIMIT 1;
                                     """).fetchone()
