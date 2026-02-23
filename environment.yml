@@ -24,6 +24,7 @@ dependencies:
   - matplotlib
   - plotly
   - seaborn
+  - leafmap
   - pytest
   - python-duckdb
   - planetary_computer
