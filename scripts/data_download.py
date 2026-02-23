@@ -206,6 +206,9 @@ class DataDownload():
             client = pystac_client.Client.open(self.api_url)
             dataset_bands = ['blue', 'red', 'nir', 'swir16', 'swir22', 'scl']
 
+        else:
+            raise ValueError("Invalid data source. Please choose either 'hls' or 'sentinel-2'.")
+
         search = client.search(collections=self.collection_id,
                                 datetime=f"{start_date}/{end_date}",
                                 bbox=aoi_bbox)
