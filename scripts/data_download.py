@@ -224,7 +224,7 @@ class DataDownload():
         ds = odc.stac.load(item_collection,
                            bands=dataset_bands,
                             group_by="solar_day",
-                            chunks={'x': 200, 'y': 200},
+                            chunks={'x': 1000, 'y': 1000},
                             use_overviews=True,
                             resolution=20,
                             bbox=aoi_bbox
@@ -257,7 +257,9 @@ class DataDownload():
         nbr_mean_ts = nbr.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
         spec_indices_ts.append(nbr_mean_ts)
 
-        results = dask.compute(*spec_indices_ts, scheduler="threads", num_workers=4)
+        results = dask.compute(*spec_indices_ts, scheduler="threads", 
+                               num_workers=4,
+                               threads_per_worker=2)
 
         results_df= pd.DataFrame({
             'time': results[0].time.values,
