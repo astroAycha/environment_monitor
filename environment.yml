@@ -27,4 +27,4 @@ dependencies:
   - leafmap
   - pytest
   - python-duckdb
-  - planetary_computer
+  - planetary-computer
