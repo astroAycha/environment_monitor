@@ -15,6 +15,7 @@ dependencies:
   - pyarrow
   - geopandas
   - dask
+  - gdal
   - rasterio
   - shapely
   - odc-stac
