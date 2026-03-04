@@ -67,11 +67,32 @@ class DataAnalysis:
         
         return stats
     
-
-    def preprocess_time_series(self, data):
+    @staticmethod
+    def preprocess_time_series(spectral_index: str,
+                               data_df: pd.DataFrame) -> pd.Series:
         """
         Preprocess the time series data for forecasting.
         This can include handling missing values, smoothing, etc.
+        Parameters:
+        ----------
+        spectral_index: str
+            The name of the spectral index to preprocess (e.g., 'ndvi').
+        data_df: pd.DataFrame
+            The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
+        Returns:
+        -------
+        pd.Series
+            A preprocessed time series of the specified spectral index, indexed by time.
         """
 
-        return NotImplemented
+        # set the index to time for time series analysis
+        data_df.set_index('time', inplace=True)
+
+        # Resample tha data to a regular interval of one week and compute the mean for each interval
+        spec_indx_resampled = data_df[spectral_index].resample('7d').mean()
+
+        # Apply a rolling mean with a window of 3 to smooth the time series
+        spec_indx_smoothed = spec_indx_resampled.rolling(window=3,
+                                                         center=True).mean()
+
+        return spec_indx_smoothed
