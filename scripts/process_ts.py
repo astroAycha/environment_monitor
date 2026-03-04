@@ -6,6 +6,7 @@ hotspot detection in images
 """
 import os
 from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.seasonal import seasonal_decompose
 import duckdb
 import pandas as pd
 from dotenv import load_dotenv
@@ -51,7 +52,7 @@ class DataAnalysis:
         
         Example usage:
         --------------
-        stats_df = compute_statistics('qastal_maaf', '2020-01-01')
+        >>> stats_df = compute_statistics('qastal_maaf', '2020-01-01')
         """
 
         query=f"""
@@ -153,3 +154,36 @@ class DataAnalysis:
         stationary = p_value < 0.05
 
         return stationary
+    
+
+    @staticmethod
+    def decompose_ts(spectral_index: str, 
+                    data_df: pd.DataFrame):
+        """
+        Decompose the time series data into trend, seasonal, and residual components.
+
+        Parameters:
+        ----------
+        spectral_index: str
+            The name of the spectral index to decompose (e.g., 'ndvi').
+        data_df: pd.DataFrame
+            The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
+        Returns:
+        -------
+        decomposition
+            The result of the seasonal decomposition, which includes the trend, seasonal, and residual components.
+
+        Example usage:
+        --------------
+        >>> decomposition = decompose_ts('ndvi', results_df)
+        >>> decomposition.plot();
+        """
+
+        data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, 
+                                                               data_df)
+
+        decomposition = seasonal_decompose(data_df_smoothed.dropna(), 
+                                           model='additive',
+                                           period=13)
+
+        return decomposition
