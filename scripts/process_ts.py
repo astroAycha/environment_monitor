@@ -68,7 +68,27 @@ class DataAnalysis:
         return stats
     
     @staticmethod
-    def preprocess_time_series(spectral_index: str,
+    def set_index_time(data_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Set the index of the DataFrame to the 'time' column for time series analysis.
+        And sort the DataFrame by the index to ensure chronological order.
+        Parameters:
+        ----------
+        data_df: pd.DataFrame
+            The DataFrame containing a 'time' column.
+        Returns:
+        -------
+        pd.DataFrame
+            The input DataFrame with the index set to the 'time' column.
+        """
+        data_df.set_index('time', inplace=True)
+        data_df.sort_index(inplace=True)
+
+        return data_df
+    
+    
+    @staticmethod
+    def preprocess_time_series(spectral_index: str, 
                                data_df: pd.DataFrame) -> pd.Series:
         """
         Preprocess the time series data for forecasting.
@@ -85,8 +105,7 @@ class DataAnalysis:
             A preprocessed time series of the specified spectral index, indexed by time.
         """
 
-        # set the index to time for time series analysis
-        data_df.set_index('time', inplace=True)
+        data_df = DataAnalysis.set_index_time(data_df)
 
         # Resample tha data to a regular interval of one week and compute the mean for each interval
         spec_indx_resampled = data_df[spectral_index].resample('7d').mean()
