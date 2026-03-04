@@ -139,9 +139,15 @@ class DataAnalysis:
         data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, data_df)
 
         result = adfuller(data_df_smoothed.dropna(), autolag='AIC')
-        
-        print(f'ADF Statistic: {result[:4]}')
 
+        adf_results = {"ADF Statistic": result[0],
+                       "p-value": result[1],
+                       "Used Lag": result[2],
+                       "Number of Observations Used": result[3],
+                       "Critical Values": result[4],
+                       "IC Best": result[5]}
+
+        print(adf_results)
         p_value = result[1]
 
         stationary = p_value < 0.05
