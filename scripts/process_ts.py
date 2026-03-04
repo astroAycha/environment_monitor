@@ -5,6 +5,7 @@ compute statistics
 hotspot detection in images
 """
 import os
+from statsmodels.tsa.stattools import adfuller
 import duckdb
 import pandas as pd
 from dotenv import load_dotenv
@@ -35,6 +36,7 @@ class DataAnalysis:
                         start_data: None | str = None) -> pd.DataFrame:
         """
         Compute statistics for the time series data.
+
         Parameters:
         ----------
         aoi_name: str
@@ -72,6 +74,7 @@ class DataAnalysis:
         """
         Set the index of the DataFrame to the 'time' column for time series analysis.
         And sort the DataFrame by the index to ensure chronological order.
+
         Parameters:
         ----------
         data_df: pd.DataFrame
@@ -92,7 +95,7 @@ class DataAnalysis:
                                data_df: pd.DataFrame) -> pd.Series:
         """
         Preprocess the time series data for forecasting.
-        This can include handling missing values, smoothing, etc.
+
         Parameters:
         ----------
         spectral_index: str
@@ -115,3 +118,32 @@ class DataAnalysis:
                                                          center=True).mean()
 
         return spec_indx_smoothed
+    
+    @staticmethod
+    def check_stationarity(spectral_index: str, 
+                           data_df: pd.DataFrame) -> bool:
+        """
+        Check the stationarity of the time series data using the Augmented Dickey-Fuller test.
+        Parameters:
+        ----------
+        spectral_index: str
+            The name of the spectral index to check (e.g., 'ndvi').
+        data_df: pd.DataFrame
+            The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
+        Returns:
+        -------
+        bool
+            True if the time series is stationary, False otherwise.
+        """
+
+        data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, data_df)
+
+        result = adfuller(data_df_smoothed.dropna(), autolag='AIC')
+        
+        print(f'ADF Statistic: {result[:4]}')
+
+        p_value = result[1]
+
+        stationary = p_value < 0.05
+
+        return stationary
