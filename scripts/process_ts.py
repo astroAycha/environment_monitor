@@ -61,7 +61,7 @@ class DataAnalysis:
                     STDDEV(ndvi) AS stddev,
                     MIN(ndvi) AS min,
                     MAX(ndvi) AS max
-            FROM read_parquet('s3://{self.bucket_name}/spectral_indices_ts/*.parquet')
+            FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/*.parquet')
             WHERE aoi_name = '{aoi_name}'
                 AND time > '{start_data if start_data else '2018-01-01'}'
                 """
@@ -144,14 +144,12 @@ class DataAnalysis:
         adf_results = {"ADF Statistic": result[0],
                        "p-value": result[1],
                        "Used Lag": result[2],
-                       "Number of Observations Used": result[3],
-                       "Critical Values": result[4],
-                       "IC Best": result[5]}
+                       "Number of Observations Used": result[3]}
 
         print(adf_results)
-        p_value = result[1]
+        p_value = adf_results["p-value"]
 
-        stationary = p_value < 0.05
+        stationary = bool(p_value < 0.05)
 
         return stationary
     
@@ -184,6 +182,6 @@ class DataAnalysis:
 
         decomposition = seasonal_decompose(data_df_smoothed.dropna(), 
                                            model='additive',
-                                           period=13)
+                                           period=13) # Assuming seasonality of 13 weeks (approximately one quarter)
 
         return decomposition
