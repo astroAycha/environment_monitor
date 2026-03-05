@@ -164,7 +164,8 @@ class DataAnalysis:
 
     @staticmethod
     def decompose_ts(spectral_index: str, 
-                    data_df: pd.DataFrame):
+                    data_df: pd.DataFrame,
+                    seasonality_period: int = 13):
         """
         Decompose the time series data into trend, seasonal, and residual components.
 
@@ -174,6 +175,8 @@ class DataAnalysis:
             The name of the spectral index to decompose (e.g., 'ndvi').
         data_df: pd.DataFrame
             The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
+        seasonality_period: int, optional
+            The number of periods in a complete seasonal cycle. Default is 13 (approximately one quarter).
         Returns:
         -------
         decomposition
@@ -190,6 +193,6 @@ class DataAnalysis:
 
         decomposition = seasonal_decompose(data_df_smoothed.dropna(), 
                                            model='additive',
-                                           period=13) # Assuming seasonality of 13 weeks (approximately one quarter)
+                                           period=seasonality_period) # Assuming seasonality of 13 weeks (approximately one quarter)
 
         return decomposition
