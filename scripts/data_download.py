@@ -224,7 +224,7 @@ class DataDownload():
         ds = odc.stac.load(item_collection,
                            bands=dataset_bands,
                             group_by="solar_day",
-                            chunks={'x': 1000, 'y': 1000},
+                            chunks={'x': 1000, 'y': 1000}, #TODO: look into optimal chunk sizes
                             use_overviews=True,
                             resolution=20,
                             bbox=aoi_bbox
