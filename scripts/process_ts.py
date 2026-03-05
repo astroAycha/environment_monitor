@@ -34,7 +34,7 @@ class DataAnalysis:
 
 
     def compute_statistics(self, aoi_name: str,
-                        start_data: None | str = None) -> pd.DataFrame:
+                        start_date: None | str = None) -> pd.DataFrame:
         """
         Compute statistics for the time series data.
 
@@ -42,7 +42,7 @@ class DataAnalysis:
         ----------
         aoi_name: str
             The name of the area of interest.
-        start_data: str, optional
+        start_date: str, optional
             The start date for the time series data in the format 'YYYY-MM-DD'.
         Returns:
         -------
@@ -52,7 +52,8 @@ class DataAnalysis:
         
         Example usage:
         --------------
-        >>> stats_df = compute_statistics('qastal_maaf', '2020-01-01')
+        >>> da = DataAnalysis()
+        >>> stats_df = da.compute_statistics('qastal_maaf', '2020-01-01')
         """
 
         query=f"""
@@ -63,7 +64,7 @@ class DataAnalysis:
                     MAX(ndvi) AS max
             FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/*.parquet')
             WHERE aoi_name = '{aoi_name}'
-                AND time > '{start_data if start_data else '2018-01-01'}'
+                AND time > '{start_date if start_date else '2018-01-01'}'
                 """
         
         stats = self.conn.execute(query).df()
@@ -111,7 +112,7 @@ class DataAnalysis:
 
         data_df = DataAnalysis.set_index_time(data_df)
 
-        # Resample tha data to a regular interval of one week and compute the mean for each interval
+        # Resample the data to a regular interval of one week and compute the mean for each interval
         spec_indx_resampled = data_df[spectral_index].resample('7d').mean()
 
         # Apply a rolling mean with a window of 3 to smooth the time series
