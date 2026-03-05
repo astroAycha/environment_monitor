@@ -15,6 +15,7 @@ dependencies:
   - pyarrow
   - geopandas
   - dask
+  - gdal
   - rasterio
   - shapely
   - odc-stac
@@ -27,4 +28,4 @@ dependencies:
   - leafmap
   - pytest
   - python-duckdb
-  - planetary_computer
+  - planetary-computer

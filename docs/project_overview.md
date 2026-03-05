@@ -1,93 +1,137 @@
-## Project Overview:
+# Geospatial MLOps Project Documentation
 
-### Project Statement (First draft - Not submitted):
-(Trying to use the format that was given as an example)
+## Project Overview
 
-A student from the GIS–Remote Sensing graduate certificate program at NSCC 
-will design and implement an automated MLOps pipeline to monitor environmental 
-indicators using satellite data from open sources, including ESA’s Copernicus 
-Sentinel missions. The project will focus on a yet to be defined geographic 
-area, with a potential case study examining environmental changes in parts 
-of Syria over the past 14 years of conflict at a regional scale. 
+### Project Statement
 
-The project will run during the Winter 2026 academic term, 
-beginning in January 2026 and concluding in April 2026. 
-The main objective is to demonstrate the value of automated, 
-scalable environmental monitoring for large-volume Earth observation data, 
-where reproducible MLOps practices and advanced analytical methods are 
-required to extract spatiotemporal patterns and predict environmental change.
+This project aims to design and implement an automated MLOps pipeline to monitor environmental indicators using satellite data from open sources, including ESA’s Copernicus Sentinel missions. The focus will be on a specific geographic area, with a potential case study examining environmental changes in parts of Syria over the past 14 years of conflict at a regional scale. 
 
-Project completion and success will be validated through end-to-end pipeline 
-automation, quantitative evaluation of models using standard statistical 
-and machine-learning performance metrics, and the delivery of an interactive 
-dashboard that visualizes spatial and temporal results in a reproducible 
-and interpretable manner. 
+The project will run during the Winter 2026 academic term, beginning in January 2026 and concluding in April 2026. The main objective is to demonstrate the value of automated, scalable environmental monitoring for large-volume Earth observation data, where reproducible MLOps practices and advanced analytical methods are required to extract spatiotemporal patterns and predict environmental change.
 
-### High Level MLOps Pipeline:
+### Objectives
 
-#### Data Ingestion:
-- Define area of interest and time period of interest
-- Decide on quantities to retrieve (e.g., spec indices)
-- OpenEO API scripts to get data
-- Download data cube spectral indices and time series
-- Keep track of data quality (missing data. coverage), meta data
-- keep data on disk or do i need an S3 bucket?
-- Check latency: how much time does it take to create and download a data cube
+- Develop an end-to-end automated pipeline for environmental monitoring.
+- Quantitatively evaluate models using standard statistical and machine-learning performance metrics.
+- Deliver an interactive dashboard to visualize spatial and temporal results in a reproducible and interpretable manner.
 
-#### Analysis & Evaluation:
-- monitoring of spectral indices to track environmental indicators 
-such as vegetation, soil moisture, wildfire burn, surface water level
-- Anomaly detection
-- Change Detection
-- Clustering
-- Detecting hotspot
-- Forecasting
-- Evaluation
+---
 
-#### Results:
-- STAC Catalog of results (see https://stac-extensions.github.io/#list-of-stac-extensions)
-- Interactive dashboard including plots
-- Summary of main results
-- Cloud storage (S3?)
-- Deploy App (need to decide on details)
+## High-Level MLOps Pipeline
 
-#### Automation:
-- Github Actions (need to decide on details)
+### 1. Data Ingestion
+- Define area of interest (AOI) and time period of interest.
+- Decide on quantities to retrieve (e.g., spectral indices).
+- Download data cube spectral indices and time series.
+- Track data quality (e.g., missing data, coverage) and metadata.
+- Evaluate storage options (e.g., local disk vs. S3 bucket).
+- Measure latency for creating and downloading data cubes.
 
-### Tentative Tech Stack
-- OpenEO API (still not sure if it will add value)
-- Airflow: pipeline orchestration
-- MLflow: managing ML experiments and logging hyperparams, metrics, models, etc.
-- sktime for time series (or other similar packages)
-- streamlit or solara for dashboard
-- plotly
-- Stac, Dask, xarray, rasterio, geopandas, etc.
-- ....
+### 2. Analysis & Evaluation
+- Monitor spectral indices to track environmental indicators such as vegetation, soil moisture, wildfire burn, and surface water levels.
+- Perform analysis such as anomaly detection, change detection, clustering, and hotspot detection.
+- Conduct forecasting and evaluate results using appropriate metrics.
 
-### Ref:
+### 3. Results
+- Generate a STAC Catalog of results (see [STAC Extensions](https://stac-extensions.github.io/#list-of-stac-extensions)).
+- Develop an interactive dashboard with plots and summaries.
+- Store results in cloud storage (AWS S3).
+- Deploy the application (details to be finalized).
+
+### 4. Automation
+- Implement CI/CD pipelines using GitHub Actions.
+- Explore Airflow for pipeline orchestration and scheduled tasks.
+
+---
+
+## Tentative Tech Stack
+
+- **Data Retrieval & Processing**: Open Data Cube ODC, Dask, xarray, rasterio, geopandas.
+- **Pipeline Orchestration**: Airflow.
+- **Experiment Tracking**: MLflow.
+- **Time Series Analysis**: Statsmodels, sktime (or similar packages).
+- **Visualization**: Streamlit or Solara, Plotly.
+- **Storage & Cataloging**: STAC, cloud storage (S3).
+
+---
+
+## References
+
 - [War and Deforestation: Using Remote Sensing and Machine Learning to Identify the War-Induced Deforestation in Syria 2010–2019](https://www.mdpi.com/2073-445X/12/8/1509)
-
 - [Multisource Remote Sensing and Machine Learning for Spatio-Temporal Drought Assessment in Northeast Syria](https://www.mdpi.com/2071-1050/17/24/10933)
+- [Harmonized Landsat Sentinel-2 (HLS) Product User Guide V2](https://lpdaac.usgs.gov/documents/1698/HLS_User_Guide_V2.pdf)
+- *Designing Machine Learning Systems: An Iterative Process for Production-Ready Applications* by Chip Huyen
+- *Software Engineering for Data Scientists* by Catherine Nelson
 
-- Designing Machine Learning Systems: An Iterative Process for Production-Ready Applications, Chip Huyen
+---
 
-- Software Engineering for Data Scientists, Catherine Nelson
+## Project Status
 
+| Pipeline Components   | Step                          | Status | Notes                                                                 |
+|-----------------------|-------------------------------|--------|----------------------------------------------------------------------|
+| **Data Acquisition**  | Define AOI/POI               |    Done    | |
+|                       | Indices to track             |   Done     | Start simple (e.g., vegetation, soil). Add more indices later.       |
+|                       | Data selection and download  | Done | Refine scripts for extracting indices and time series.      |
+|                       | Feature selection/creation   |        | Time series forecasting will require additional feature engineering. |
+|                       | Data quality                 |        | Log issues with MLflow; decide actions for data gaps or distribution changes. |
+| **Analysis & Evaluation** |           |        |      Anomaly detection, Forecasting                                                          |
+| **Results**           | Dashboard                    |        | Include interactive plots and summaries.                            |
+|                       | Deployment                   |        |                                                                      |
+| **Automation**        | CI/CD                        |        | GitHub Actions for automation; explore Airflow for scheduled tasks. |
 
+---
 
-### Status
+## Data Download Implementation
 
-| Pipeline Components | Step   | Status | Notes |
-| :---               | :---   | :---   | :---- |
-| Data Acquisition   | define AOI/POI | |2-3 AOI in syria during the 14 years war. Add another region in Ontario to see how the pipeline generalizes? How many AOIs? Check availability of data |
-| Data Acquisition   | indices to track (vegetation, soil, urban...) | | Keep it simple as a start. Add more later |
-| Data Acquisition   | feature selection/creation |  | Time series forecasting will require additional work on feature engineering |
-| Data Acquisition   | data selection and download | Rough code to extract indices and time series | |
-| Data Acquisition   | data quality |  | log with mlflow, decide on actions in case of data issues (large gaps, change in dist, ...) | 
-| Analysis & Evaluation |... | ... | ... |
-| Analysis & Evaluation | | | |
-| Analysis & Evaluation | | | |
-| Results | Dashboard | | including interactive plots and summaries|
-| Results | Deployment | | |
-| Automation | | | Github Actions might be sufficient. Airflow is good too for scheduled tasks. This is the most important part of this project, i.e., testing the limits of how much automation is possible for multiple tasks and potentially multiple data sources. I anticipate latency might be an issue considering compute and data download|
-|              |    |   |  |
+The `data_download.py` script is responsible for automating the retrieval and processing of satellite data from STAC catalogs. Below is an overview of its key functionalities:
+
+#### Key Features
+
+1. **Bounding Box Definition**:
+   - Allows users to define an area of interest (AOI) by specifying latitude, longitude, and a buffer radius.
+   - Uses `shapely` and `geopandas` to create and project bounding boxes.
+
+2. **Data Masking**:
+   - Masks invalid data based on Scene Classification Layer (SCL) values.
+   - Supports both HLS and Sentinel-2 data sources with tailored masking rules.
+
+3. **Time Series Extraction**:
+   - Extracts time series of spectral indices (e.g., NDVI, BSI, NDMI, NBR) for a given AOI and date range.
+   - Utilizes `pystac_client` for data search and `odc.stac` for loading datasets.
+   - Computes weekly averages of indices using `dask` for parallel processing.
+
+4. **Data Storage**:
+   - Saves processed time series data as Parquet files in an S3 bucket.
+   - Logs metadata and summary statistics for extracted indices.
+
+5. **Time Series Updates**:
+   - Checks existing time series data in the S3 bucket and updates it with new data if available.
+   - Ensures continuity by appending only the missing data.
+
+#### Spectral Indices Supported
+
+- **NDVI (Normalized Difference Vegetation Index)**: Tracks vegetation health.
+- **BSI (Bare Soil Index)**: Monitors soil exposure.
+- **NDMI (Normalized Difference Moisture Index)**: Measures moisture content.
+- **NBR (Normalized Burn Ratio)**: Detects burned areas.
+
+#### Example Workflow
+
+1. Define an AOI:
+   ```python
+   downloader = DataDownload(data_source='sentinel-2')
+   bbox = downloader.define_bbox(33.5138, 36.2765, 100)
+   ```
+
+2. Extract Time Series:
+   ```python
+   ts_gdf = downloader.extract_time_series(bbox, "Damascus", "2024-01-01", "2024-02-01")
+   ```
+
+3. Update Time Series:
+   ```python
+   downloader.update_time_series("Damascus")
+   ```
+
+#### Logging and Error Handling
+- Logs all operations to `data_download.log` in the `logs/` directory.
+- Handles errors gracefully, ensuring that invalid inputs or missing data are reported.
