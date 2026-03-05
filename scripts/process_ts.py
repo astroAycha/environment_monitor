@@ -56,18 +56,20 @@ class DataAnalysis:
         >>> stats_df = da.compute_statistics('qastal_maaf', '2020-01-01')
         """
 
-        query=f"""
+        query = f"""
                 SELECT 
                     AVG(ndvi) AS mean,
                     STDDEV(ndvi) AS stddev,
                     MIN(ndvi) AS min,
                     MAX(ndvi) AS max
-            FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/*.parquet')
-            WHERE aoi_name = '{aoi_name}'
-                AND time > '{start_date if start_date else '2018-01-01'}'
+                FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/*.parquet')
+                WHERE aoi_name = ?
+                AND time > ?
                 """
+
+        params = (aoi_name, start_date if start_date else '2018-01-01')
         
-        stats = self.conn.execute(query).df()
+        stats = self.conn.execute(query, params).df()
         
         return stats
     
