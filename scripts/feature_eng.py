@@ -1,6 +1,5 @@
 """ Feature engineering for time series data, including lag features, date-time features, and aggregate features. """
 import pandas as pd
-import numpy as np
 
 class TimeSeriesFeatureEngineer:
     """
