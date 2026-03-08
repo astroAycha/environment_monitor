@@ -14,7 +14,8 @@ class TimeSeriesFeatureEngineer:
         Parameters:
             data (pd.DataFrame): The time series data with a datetime index.
         """
-        self.data = data
+        self.data = data.set_index('time') if 'time' in data.columns else data
+        self.data.sort_index(inplace=True)
 
     def generate_lag_features(self, 
                               spec_index: str,
