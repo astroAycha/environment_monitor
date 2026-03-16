@@ -62,7 +62,7 @@ class DataAnalysis:
                     STDDEV(ndvi) AS stddev,
                     MIN(ndvi) AS min,
                     MAX(ndvi) AS max
-                FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/*.parquet')
+                FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/**/*.parquet')
                 WHERE aoi_name = ?
                 AND time > ?
                 """
