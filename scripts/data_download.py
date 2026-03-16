@@ -212,7 +212,9 @@ class DataDownload():
 
         search = client.search(collections=self.collection_id,
                                 datetime=f"{start_date}/{end_date}",
-                                bbox=aoi_bbox)
+                                bbox=aoi_bbox,
+                                query={"eo:cloud_cover": {"lt": 20}}
+                                )
         
         item_collection = search.item_collection()
 
