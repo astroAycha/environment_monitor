@@ -121,8 +121,8 @@ class DataAnalysis:
             # Resample the data to a regular interval of one week and compute the mean for each interval
             spec_indx_resampled = data_df[index].resample('7d').mean().fillna(method='ffill')
 
-            # Apply a rolling mean with a window of 3 to smooth the time series
-            spec_indx_smoothed = spec_indx_resampled.rolling(window=3,
+            # Apply a rolling mean with a window of 2 to smooth the time series
+            spec_indx_smoothed = spec_indx_resampled.rolling(window=2,
                                                             center=True).mean()
             
             # Add the smoothed time series as a new column in the DataFrame
