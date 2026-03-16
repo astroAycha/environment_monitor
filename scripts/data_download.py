@@ -306,7 +306,7 @@ class DataDownload():
         # write dataframe to s3 bucket
         # this requires proper permissions to the bucket
         file_name = f'indices_time_series_{start_date}_to_{end_date}'
-        dir_name = "spectral_indices_ts"
+        dir_name = f"spectral_indices_ts/{aoi_name}"
         s3_path = f's3://{self.bucket_name}/{dir_name}/{file_name}.parquet'
         indices_gdf.to_parquet(s3_path, index=False)
         # TODO: look into adding metadata to the parquet file
@@ -342,7 +342,7 @@ class DataDownload():
         # first check the last date of the existing time series
         # use a wildcard to read all parquet files in the directory and get the max date
 
-        dir_name = 'spectral_indices_ts'
+        dir_name = f'spectral_indices_ts/{aoi_name}'
         today = datetime.date.today()
 
         try:
