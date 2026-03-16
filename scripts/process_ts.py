@@ -95,33 +95,40 @@ class DataAnalysis:
     
     
     @staticmethod
-    def preprocess_time_series(spectral_index: str, 
-                               data_df: pd.DataFrame) -> pd.Series:
+    def preprocess_time_series(spectral_index: list[str], 
+                               data_df: pd.DataFrame) -> pd.DataFrame:
         """
         Preprocess the time series data for forecasting.
 
         Parameters:
         ----------
-        spectral_index: str
-            The name of the spectral index to preprocess (e.g., 'ndvi').
+        spectral_index: list[str]
+            A list of spectral indices to preprocess (e.g., ['ndvi', 'evi']).
         data_df: pd.DataFrame
-            The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
+            The DataFrame containing the time series data with a 'time' column and the specified spectral index columns.
         Returns:
         -------
-        pd.Series
-            A preprocessed time series of the specified spectral index, indexed by time.
+        pd.DataFrame
+            A DataFrame containing the preprocessed time series of the specified spectral indices, indexed by time.
         """
 
         data_df = DataAnalysis.set_index_time(data_df)
 
-        # Resample the data to a regular interval of one week and compute the mean for each interval
-        spec_indx_resampled = data_df[spectral_index].resample('7d').mean()
+        for index in spectral_index:
+            if index not in data_df.columns:
+                raise ValueError(f"Spectral index '{index}' not found in the DataFrame columns.")  
+             
+            # Resample the data to a regular interval of one week and compute the mean for each interval
+            spec_indx_resampled = data_df[index].resample('7d').mean().fillna(method='ffill')
 
-        # Apply a rolling mean with a window of 3 to smooth the time series
-        spec_indx_smoothed = spec_indx_resampled.rolling(window=3,
-                                                         center=True).mean()
+            # Apply a rolling mean with a window of 3 to smooth the time series
+            spec_indx_smoothed = spec_indx_resampled.rolling(window=3,
+                                                            center=True).mean()
+            
+            # Add the smoothed time series as a new column in the DataFrame
+            data_df[f"{index}_smooth"] = spec_indx_smoothed
 
-        return spec_indx_smoothed
+        return data_df
     
     @staticmethod
     def check_stationarity(spectral_index: str, 
