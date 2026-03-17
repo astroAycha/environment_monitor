@@ -33,7 +33,8 @@ class DataAnalysis:
         self.conn.execute("LOAD spatial;")
 
 
-    def compute_statistics(self, aoi_name: str,
+    def compute_statistics(self, 
+                        aoi_name: str,
                         start_date: None | str = None) -> pd.DataFrame:
         """
         Compute statistics for the time series data.
@@ -48,7 +49,7 @@ class DataAnalysis:
         -------
         pd.DataFrame
             A DataFrame containing the mean, 
-            standard deviation, minimum, and maximum of the NDVI values for the specified area of interest and time range.
+            standard deviation, minimum, and maximum of the NDVI, BSI, NDMI, and NBR values for the specified area of interest and time range.
         
         Example usage:
         --------------
@@ -58,10 +59,25 @@ class DataAnalysis:
 
         query = f"""
                 SELECT 
-                    AVG(ndvi) AS mean,
-                    STDDEV(ndvi) AS stddev,
-                    MIN(ndvi) AS min,
-                    MAX(ndvi) AS max
+                    COUNT(*) AS count,
+                    MIN(time) AS earliest_time,
+                    MAX(time) AS latest_time,
+                    AVG(ndvi) AS mean_ndvi,
+                    STDDEV(ndvi) AS stddev_ndvi,
+                    MIN(ndvi) AS min_ndvi,
+                    MAX(ndvi) AS max_ndvi,
+                    AVG(bsi) AS mean_bsi,
+                    STDDEV(bsi) AS stddev_bsi,
+                    MIN(bsi) AS min_bsi,
+                    MAX(bsi) AS max_bsi,
+                    AVG(ndmi) AS mean_ndmi,
+                    STDDEV(ndmi) AS stddev_ndmi,
+                    MIN(ndmi) AS min_ndmi,
+                    MAX(ndmi) AS max_ndmi,
+                    AVG(nbr) AS mean_nbr,
+                    STDDEV(nbr) AS stddev_nbr,
+                    MIN(nbr) AS min_nbr,
+                    MAX(nbr) AS max_nbr
                 FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/**/*.parquet')
                 WHERE aoi_name = ?
                 AND time > ?
@@ -117,18 +133,17 @@ class DataAnalysis:
         for index in spectral_index:
             if index not in data_df.columns:
                 raise ValueError(f"Spectral index '{index}' not found in the DataFrame columns.")  
-             
-            # Resample the data to a regular interval of one week and compute the mean for each interval
-            spec_indx_resampled = data_df[index].resample('7d').mean().fillna(method='ffill')
+        
+        smoothed_df = pd.DataFrame()
 
-            # Apply a rolling mean with a window of 2 to smooth the time series
-            spec_indx_smoothed = spec_indx_resampled.rolling(window=2,
-                                                            center=True).mean()
-            
-            # Add the smoothed time series as a new column in the DataFrame
-            data_df[f"{index}_smooth"] = spec_indx_smoothed
+        for indx in spectral_index:
+            smoothed_df[f"{indx}_smooth"] = (data_df[indx]
+                                            .resample('W').mean()
+                                            .interpolate(method='time', limit_direction='both')
+                                            .rolling(window=2, center=True, min_periods=1).mean()
+                                            )
 
-        return data_df
+        return smoothed_df
     
     @staticmethod
     def check_stationarity(spectral_index: str, 
@@ -197,7 +212,7 @@ class DataAnalysis:
         >>> decomposition.plot();
         """
 
-        data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, 
+        data_df_smoothed = DataAnalysis.preprocess_time_series([spectral_index], 
                                                                data_df)
 
         decomposition = seasonal_decompose(data_df_smoothed.dropna(), 
