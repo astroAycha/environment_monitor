@@ -162,7 +162,7 @@ class DataAnalysis:
             True if the time series is stationary, False otherwise.
         """
 
-        data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, data_df)
+        data_df_smoothed = DataAnalysis.preprocess_time_series([spectral_index], data_df)
 
         # Require at least a few non-NaN observations and non-constant values
         if len(data_df_smoothed.dropna()) < 3 or data_df_smoothed.dropna().nunique() < 2:
@@ -171,7 +171,7 @@ class DataAnalysis:
                 "After preprocessing, the series has fewer than 3 non-NaN points or is constant."
             )
 
-        result = adfuller(data_df_smoothed.dropna(), autolag='AIC')
+        result = adfuller(data_df_smoothed[f"{spectral_index}_smooth"].dropna(), autolag='AIC')
 
         adf_results = {"ADF Statistic": result[0],
                        "p-value": result[1],
