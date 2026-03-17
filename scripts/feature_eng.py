@@ -79,6 +79,6 @@ class TimeSeriesFeatureEngineer:
 
         for window in window_sizes:
             self.data[f'{spec_index}_rolling_mean_{window}'] = self.data[spec_index].rolling(window=window).mean()
-            self.data[f'{spec_index}_rolling_std_{window}'] = self.data[spec_index].rolling(window=window).std()
+            # self.data[f'{spec_index}_rolling_std_{window}'] = self.data[spec_index].rolling(window=window).std()
 
         return self.data
