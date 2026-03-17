@@ -127,8 +127,11 @@ class DataAnalysis:
         pd.DataFrame
             A DataFrame containing the preprocessed time series of the specified spectral indices, indexed by time.
         """
-
-        data_df = DataAnalysis.set_index_time(data_df)
+        if not isinstance(data_df.index, pd.DatetimeIndex):
+            if 'time' not in data_df.columns:
+                raise ValueError("The DataFrame must contain a 'time' column for preprocessing.")
+            else:
+                data_df = DataAnalysis.set_index_time(data_df)
 
         for index in spectral_index:
             if index not in data_df.columns:
