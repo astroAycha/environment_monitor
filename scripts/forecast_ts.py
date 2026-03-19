@@ -8,24 +8,32 @@ from sktime.forecasting.base import ForecastingHorizon
 from sklearn.ensemble import RandomForestRegressor
 import mlflow
 
-# Load your time series data (example assumes a DataFrame with 'value' column and datetime index)
-# data = pd.read_csv('path_to_your_data.csv', index_col=0, parse_dates=True)
 
 class ForecastTS:
     """Forecast time series"""
 
-    def __init__(self, model, steps):
-        self.model = model
-        self.steps = steps
+    def __init__(self, mlflow_experiment_name: str):
+        self.mlflow_experiment_name = mlflow_experiment_name
 
     def forecast(self, 
                     data_df: pd.DataFrame,
                     target_indx: str) -> None:
         """
         Perform time series forecasting using sktime, cross-validation, and log the experiment with MLflow.
+
+        Parameters:
+        -----------
+        data_df: pd.DataFrame
+            The input DataFrame containing the time series data. 
+            It should have a DatetimeIndex and columns corresponding to the target variable and features.
+        target_indx: str
+            The prefix of the target variable columns in the DataFrame.
         """
+        if not isinstance(data_df.index, pd.DatetimeIndex):
+            raise ValueError("The index of the DataFrame must be a DatetimeIndex for time series forecasting.")
+        
         # Split data into training and test sets
-        cols = [col for col in data_df.columns if col[:4]==target_indx]
+        cols = [col for col in data_df.columns if col.split('_')[0]==target_indx]
         print(f"Columns used for forecasting: {cols}")
         
         # Define target (y) and features (X)
@@ -56,7 +64,7 @@ class ForecastTS:
         gscv = ForecastingGridSearchCV(forecaster, cv=cv, param_grid=param_grid)#, scoring="mean_absolute_percentage_error")
 
         # Start MLflow experiment
-        mlflow.set_experiment("geospatial-ml")
+        mlflow.set_experiment(self.mlflow_experiment_name)
         with mlflow.start_run():
             # Fit the model
             gscv.fit(y_train, X=X_train)
