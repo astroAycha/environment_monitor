@@ -29,22 +29,25 @@ class ForecastTS:
         target_indx: str
             The prefix of the target variable columns in the DataFrame.
         """
-        if not isinstance(data_df.index, pd.DatetimeIndex):
-            raise ValueError("The index of the DataFrame must be a DatetimeIndex for time series forecasting.")
         
+        # everything should be in lowercase
+        target_indx = target_indx.lower()
+
         # Split data into training and test sets
-        cols = [col for col in data_df.columns if col.split('_')[0]==target_indx]
-        print(f"Columns used for forecasting: {cols}")
+        # Keep only the index and its features
+        features_cols = [col for col in data_df.columns if col.split('_')[0]==target_indx]
+        print(f"Columns used for forecasting: {features_cols}")
         
-        # Define target (y) and features (X)
+        # Define target y and features X
         y = data_df[f'{target_indx}_smooth']
-        X = data_df[cols].drop(columns=[f'{target_indx}_smooth'])
+        X = data_df[features_cols].drop(columns=[f'{target_indx}_smooth'])
         
         # Perform train-test split
         X_train, X_test, y_train, y_test = temporal_train_test_split(X, y, test_size=0.2)
 
         if not isinstance(data_df.index, pd.DatetimeIndex):
             raise ValueError("The index of the DataFrame must be a DatetimeIndex for time series forecasting.")
+        
         # Define forecasting horizon
         fh = ForecastingHorizon(y_test.index, is_relative=False)
 
