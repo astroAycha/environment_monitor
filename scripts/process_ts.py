@@ -1,10 +1,10 @@
 """
 scripts to analyze the downloaded data
 """
-import os
+
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
-import duckdb
+
 import pandas as pd
 from dotenv import load_dotenv
 
