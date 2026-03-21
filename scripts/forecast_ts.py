@@ -1,7 +1,9 @@
 """Forecast time series"""
 import statsmodels
 import pandas as pd
-from sktime.forecasting.model_selection import temporal_train_test_split, ForecastingGridSearchCV, SlidingWindowSplitter
+from sktime.forecasting.model_selection import ForecastingGridSearchCV
+from sktime.split import temporal_train_test_split
+from sktime.split import SlidingWindowSplitter
 from sktime.forecasting.compose import make_reduction
 from sktime.performance_metrics.forecasting import mean_absolute_percentage_error, mean_absolute_error
 from sktime.forecasting.base import ForecastingHorizon
