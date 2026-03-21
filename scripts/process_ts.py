@@ -4,11 +4,7 @@ scripts to analyze the downloaded data
 
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
-
 import pandas as pd
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 class DataAnalysis:
@@ -16,7 +12,7 @@ class DataAnalysis:
     Class to analyze the time series data.
     """
     def __init__(self):
-    
+        pass
     
     @staticmethod
     def set_index_time(data_df: pd.DataFrame) -> pd.DataFrame:
