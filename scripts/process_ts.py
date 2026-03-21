@@ -20,11 +20,12 @@ class DataAnalysis:
         Set the index of the DataFrame to the 'time' column for time series analysis.
         And sort the DataFrame by the index to ensure chronological order.
 
-        Parameters:
+        Parameters
         ----------
         data_df: pd.DataFrame
             The DataFrame containing a 'time' column.
-        Returns:
+        
+        Returns
         -------
         pd.DataFrame
             The input DataFrame with the index set to the 'time' column.
@@ -39,18 +40,27 @@ class DataAnalysis:
     def preprocess_time_series(spectral_index: list[str], 
                                data_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the time series data for forecasting.
+        + Preprocess the time series data for forecasting.
+        + Resample time series on a weekly basis.
+        + Interpolate to fill in missing values using time.
+        + Smooth the specified spectral index columns in the DataFrame.
 
-        Parameters:
+        Parameters
         ----------
         spectral_index: list[str]
             A list of spectral indices to preprocess (e.g., ['ndvi', 'evi']).
         data_df: pd.DataFrame
             The DataFrame containing the time series data with a 'time' column and the specified spectral index columns.
-        Returns:
+        
+        Returns
         -------
-        pd.DataFrame
+        smoothed_df: pd.DataFrame
             A DataFrame containing the preprocessed time series of the specified spectral indices, indexed by time.
+        
+        Example usage:
+        --------------
+        >>> da = DataAnalysis()
+        >>> preprocessed_df = preprocess_time_series(['ndvi', 'bsi'], raw_data_df)
         """
         if not isinstance(data_df.index, pd.DatetimeIndex):
             if 'time' not in data_df.columns:
@@ -78,15 +88,17 @@ class DataAnalysis:
                            data_df: pd.DataFrame) -> bool:
         """
         Check the stationarity of the time series data using the Augmented Dickey-Fuller test.
-        Parameters:
+        
+        Parameters
         ----------
         spectral_index: str
             The name of the spectral index to check (e.g., 'ndvi').
         data_df: pd.DataFrame
             The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
-        Returns:
+        
+        Returns
         -------
-        bool
+        stationary: bool
             True if the time series is stationary, False otherwise.
         """
 
@@ -120,7 +132,6 @@ class DataAnalysis:
                     seasonality_period: int = 13):
         """
         Decompose the time series data into trend, seasonal, and residual components.
-
         Parameters:
         ----------
         spectral_index: str
