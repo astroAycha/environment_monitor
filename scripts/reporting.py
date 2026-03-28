@@ -57,6 +57,7 @@ class Reporting:
                     COUNT(*) AS count,
                     MIN(time) AS earliest_time,
                     MAX(time) AS latest_time,
+                    extract('year' FROM time) AS year,
                     AVG(ndvi) AS mean_ndvi,
                     STDDEV(ndvi) AS stddev_ndvi,
                     MIN(ndvi) AS min_ndvi,
