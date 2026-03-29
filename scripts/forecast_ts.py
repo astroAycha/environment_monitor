@@ -1,9 +1,10 @@
 """Forecast time series"""
 
 from datetime import date
-
+import pickle
 import pandas as pd
 import mlflow
+import os
 from scripts.process_ts import DataAnalysis
 from sktime.split import temporal_train_test_split
 from sktime.forecasting.base import ForecastingHorizon
@@ -30,10 +31,31 @@ class ForecastTS:
 
     def __init__(self, mlflow_experiment_name: str):
         self.mlflow_experiment_name = mlflow_experiment_name
+        
+        mlflow.set_tracking_uri("http://127.0.0.1:5000")
+        mlflow.set_experiment(self.mlflow_experiment_name)
+        
+        self.forecast_models_dir = "/Users/aycha.tammour/geospatial_mlops/forecasting_models"
+        if not os.path.exists(self.forecast_models_dir):
+            os.makedirs(self.forecast_models_dir)
 
     @staticmethod
     def format_input_data(input_df: pd.DataFrame) -> pd.DataFrame:
-        """Format the input DataFrame for forecasting.
+        """
+        Format the input DataFrame for forecasting using MLForecast
+        
+        Parameters
+        ----------
+        input_df: pd.DataFrame
+            The input DataFrame containing the time series data. 
+            It should have a 'time' column and one or more columns 
+            corresponding to the target variable and features.
+        
+        Returns
+        -------
+        pd.DataFrame
+            A formatted DataFrame suitable for use with MLForecast, 
+            containing columns 'ds', 'y', and 'unique_id'.
         """
 
         cols = [col for col in input_df.columns if col != 'time']
@@ -43,54 +65,63 @@ class ForecastTS:
         
         dfs = []
         for i, col in enumerate(process_data.columns):
-            input_df = pd.DataFrame({
+            temp_df = pd.DataFrame({
                                     'ds': process_data.index,
                                     'y': process_data[col],
                                     'unique_id': i
                                             })
-            dfs.append(input_df)
+            dfs.append(temp_df)
 
         output_df = pd.concat(dfs, ignore_index=True)
             
         return output_df
+    
+    def _get_mlforecast(self, model):
+
+        return MLForecast(
+            models=[model],
+            freq='W',
+            lags=[1, 13, 52],
+            lag_transforms={
+                1:  [(rolling_mean, 3)],
+                13: [(rolling_mean, 13)],
+            },
+            date_features=['quarter', 'year'],
+        )
 
     def forecast_xgb(self,
                      input_data: pd.DataFrame,
                      forecast_horizon: int) -> pd.DataFrame:
-        """Forecast using XGBoost model."""
+        """
+        Forecast using XGBoost model.
         
+        Parameters
+        ----------
+        input_data: pd.DataFrame
+            The input DataFrame containing the time series data. 
+            It should have a DatetimeIndex and columns corresponding to the target variable and features.
+        forecast_horizon: int
+            The number of future time steps to forecast.
 
-        mlflow.set_tracking_uri("http://127.0.0.1:5000")
-        mlflow.set_experiment(self.mlflow_experiment_name)
-
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the forecasted values for the specified horizon.
+        """
+    
+        # hyperparameter optimization with Optuna
         def objective(trial):
             params = {
-                'n_estimators':     trial.suggest_int('n_estimators', 50, 500),
-                'max_depth':        trial.suggest_int('max_depth', 3, 10),
-                'learning_rate':    trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
-                'subsample':        trial.suggest_float('subsample', 0.5, 1.0),
+                'n_estimators': trial.suggest_int('n_estimators', 50, 500),
+                'max_depth': trial.suggest_int('max_depth', 3, 10),
+                'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
+                'subsample': trial.suggest_float('subsample', 0.5, 1.0),
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
             }
 
-            mf = MLForecast(
-                models=[XGBRegressor(**params, verbosity=0)],
-                freq='W',
-                lags=[1, 13, 52],
-                lag_transforms={
-                    1:  [(rolling_mean, 3)],
-                    13: [(rolling_mean, 13)],
-                    52: [(rolling_mean, 52)],
-                },
-                date_features=['quarter', 'year'],
-                # target_transforms=[Differences([13])]
-                )
+            mf = self._get_mlforecast(XGBRegressor(**params, verbosity=0))
 
-            input_df = self.format_input_data(input_data)
-            train_df = input_df.iloc[:-forecast_horizon]
-            test_df = input_df.iloc[-forecast_horizon:]
-
-
-            cv = mf.cross_validation(train_df, n_windows=3, h=26)
+            cv = mf.cross_validation(input_data, n_windows=3, h=forecast_horizon)
             mape = mean_absolute_percentage_error(cv['y'], cv['XGBRegressor'])
             rmse = root_mean_squared_error(cv['y'], cv['XGBRegressor'])
             mae = mean_absolute_error(cv['y'], cv['XGBRegressor'])
@@ -120,31 +151,72 @@ class ForecastTS:
         with mlflow.start_run(run_name="best_model"):
             best = study.best_params
 
-            mf_best = MLForecast(
-                models=[XGBRegressor(**best, verbosity=0)],
-                freq='W',
-                lags=[1, 13, 52],
-                lag_transforms={
-                    1:  [(rolling_mean, 3)],
-                    13: [(rolling_mean, 13)],
-                    52: [(rolling_mean, 52)],
-                },
-                date_features=['quarter', 'year'],
-                # target_transforms=[Differences([13])]
-                )
+            mf_best = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
 
-            mf_best.fit(train_df)
+            mf_best.fit(input_data)
 
-        # Log the underlying XGBoost model
-        mlflow.xgboost.log_model(mf_best.models_['XGBRegressor'], name="model")
-        mlflow.log_params(best)
-        mlflow.log_metric("best_mae", study.best_value)
+            # save full MLForecast object
+            with open(os.path.join(self.forecast_models_dir, "mf_best.pkl"), "wb") as f:
+                pickle.dump(mf_best, f)
+            mlflow.log_artifact(os.path.join(self.forecast_models_dir, "mf_best.pkl"))
+            mlflow.xgboost.log_model(mf_best.models_['XGBRegressor'], name="model")
+            mlflow.log_params(best)
+            mlflow.log_metric("best_mae", study.best_value)
 
-        forecast = mf_best.predict(h=forecast_horizon)
+            forecast = mf_best.predict(h=forecast_horizon)
+
+        return forecast
+ 
+
+    def predict_xgb(self, 
+                    experiment_name: str, 
+                    forecast_horizon: int) -> pd.DataFrame:
+        """
+        Load the best XGBoost model from MLflow and predict future values.
+
+        Parameters
+        ----------
+        experiment_name: str
+            The name of the MLflow experiment where the model was logged.
+        forecast_horizon: int
+            The number of future time steps to forecast.
         
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the forecasted values for the specified horizon.
+        """
+        print("1. searching runs...")
+        best_run = mlflow.search_runs(
+            experiment_names=[experiment_name],
+            filter_string="tags.mlflow.runName = 'best_model'",
+            order_by=["metrics.best_mae ASC"],
+            max_results=1).iloc[0]
+        print("2. found run:", best_run["run_id"])
+
+        run_id = best_run["run_id"]
+        print(f"Loading model from run: {run_id}")
+        artifact_uri = best_run["artifact_uri"]
+        print(best_run["artifact_uri"])
+
+        # Build local path to the model artifact
+        experiment_id = artifact_uri.split("/")[1]
+        pkl_path = os.path.join(self.forecast_models_dir, "mf_best.pkl")
+        print("4. loading pickle from:", pkl_path)
+
+        print("5. loading pickle...")
+        with open(pkl_path, "rb") as f:
+            mf_best = pickle.load(f)
+        print("6. pickle loaded")
+
+        print("7. predicting...")
+        # Predict directly — no fit needed 
+        forecast = mf_best.predict(h=forecast_horizon)
+        print("8. done")
+
         return forecast
     
-
+##########################
 
     def forecast_ensemble(self, 
                           data_df: pd.DataFrame) -> pd.DataFrame:
