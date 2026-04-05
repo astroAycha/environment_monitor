@@ -64,11 +64,12 @@ class ForecastTS:
         process_data = da.preprocess_time_series(cols, input_df)
         
         dfs = []
-        for i, col in enumerate(process_data.columns):
+        for _, col in enumerate(process_data.columns):
+            uid = col.split("_")[0]
             temp_df = pd.DataFrame({
                                     'ds': process_data.index,
                                     'y': process_data[col],
-                                    'unique_id': i
+                                    'unique_id': uid
                                             })
             dfs.append(temp_df)
 
