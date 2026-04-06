@@ -1,6 +1,6 @@
 """Forecast time series"""
 
-from datetime import date
+from datetime import datetime, date, timezone
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pickle
@@ -35,7 +35,7 @@ class ForecastTS:
                  aoi_name: str):
         
         self.aoi_name = aoi_name
-        self.mlflow_experiment_name = f"{self.aoi_name}_{date.today().strftime('%Y-%m-%d')}"
+        self.mlflow_experiment_name = f"{self.aoi_name}_{datetime.now(timezone.utc).strftime('%Y-%m-%d_%H-%M')}"
         
         mlflow.set_tracking_uri("http://127.0.0.1:5000")
         mlflow.set_experiment(self.mlflow_experiment_name)
@@ -208,7 +208,6 @@ class ForecastTS:
         print(best_run["artifact_uri"])
 
         # Build local path to the model artifact
-        experiment_id = artifact_uri.split("/")[1]
         pkl_path = os.path.join(self.forecast_models_dir, "mf_best.pkl")
         print("4. loading pickle from:", pkl_path)
 
@@ -221,7 +220,6 @@ class ForecastTS:
         # Predict directly — no fit needed
         forecast = mf_best.predict(h=forecast_horizon)
         print("8. done")
-
 
         # add a forecasting date column to the forecast table
         forecast_date = date.today().strftime('%Y-%m-%d')
