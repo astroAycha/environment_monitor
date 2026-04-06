@@ -1,6 +1,8 @@
 """Forecast time series"""
 
 from datetime import date
+import pyarrow as pa
+import pyarrow.dataset as ds
 import pickle
 import pandas as pd
 import mlflow
@@ -29,8 +31,10 @@ from sklearn.metrics import (mean_absolute_percentage_error,
 class ForecastTS:
     """Forecast time series"""
 
-    def __init__(self, mlflow_experiment_name: str):
+    def __init__(self, mlflow_experiment_name: str,
+                 aoi_name: str):
         self.mlflow_experiment_name = mlflow_experiment_name
+        self.aoi_name = aoi_name
         
         mlflow.set_tracking_uri("http://127.0.0.1:5000")
         mlflow.set_experiment(self.mlflow_experiment_name)
@@ -38,6 +42,8 @@ class ForecastTS:
         self.forecast_models_dir = "/Users/aycha.tammour/geospatial_mlops/forecasting_models"
         if not os.path.exists(self.forecast_models_dir):
             os.makedirs(self.forecast_models_dir)
+
+        self.bucket_name = os.getenv("S3_BUCKET_NAME")
 
     @staticmethod
     def format_input_data(input_df: pd.DataFrame) -> pd.DataFrame:
@@ -137,7 +143,7 @@ class ForecastTS:
             return mae
 
         # Wrap the whole study in a parent run
-        with mlflow.start_run(run_name=f"{date.today().strftime('%Y-%m-%d %H:%M:%S')}"):
+        with mlflow.start_run(run_name=f"{self.aoi_name}_{date.today().strftime('%Y-%m-%d %H:%M:%S')}"):
             study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=100, show_progress_bar=True)
 
@@ -149,7 +155,7 @@ class ForecastTS:
             print("Best params:", study.best_params)
 
         # Refit best model and log it
-        with mlflow.start_run(run_name="best_model"):
+        with mlflow.start_run(run_name=f"{self.aoi_name}_best_model"):
             best = study.best_params
 
             mf_best = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
@@ -190,7 +196,7 @@ class ForecastTS:
         print("1. searching runs...")
         best_run = mlflow.search_runs(
             experiment_names=[experiment_name],
-            filter_string="tags.mlflow.runName = 'best_model'",
+            filter_string=f"tags.mlflow.runName = '{self.aoi_name}_best_model'",
             order_by=["metrics.best_mae ASC"],
             max_results=1).iloc[0]
         print("2. found run:", best_run["run_id"])
@@ -211,9 +217,31 @@ class ForecastTS:
         print("6. pickle loaded")
 
         print("7. predicting...")
-        # Predict directly — no fit needed 
+        # Predict directly — no fit needed
         forecast = mf_best.predict(h=forecast_horizon)
         print("8. done")
+
+
+        # add a forecasting date column to the forecast table
+        forecast_date = date.today().strftime('%Y-%m-%d')
+        forecast['forecast_date'] = forecast_date
+        # add area of interest column to the forecast table
+        forecast['aoi_name'] = self.aoi_name
+
+        table = pa.Table.from_pandas(forecast)
+
+        file_name = f"xgb_forecast_{self.aoi_name}_{date.today().strftime('%Y-%m-%d')}"
+        dir_name = f"forecasts/{experiment_name}"
+        s3_path = f's3://{self.bucket_name}/{dir_name}/{file_name}.parquet'
+
+        ds.write_dataset(table,
+                         base_dir=s3_path,
+                         format="parquet",
+                         partitioning=["forecast_date", "aoi_name"],
+                         existing_data_behavior="overwrite_or_ignore")
+        
+        # forecast.to_parquet(s3_path, index=False)
+        print(f"Forecast saved to: {s3_path}")
 
         return forecast
     
