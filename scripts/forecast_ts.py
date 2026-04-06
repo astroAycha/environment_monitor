@@ -31,15 +31,16 @@ from sklearn.metrics import (mean_absolute_percentage_error,
 class ForecastTS:
     """Forecast time series"""
 
-    def __init__(self, mlflow_experiment_name: str,
+    def __init__(self,
                  aoi_name: str):
-        self.mlflow_experiment_name = mlflow_experiment_name
+        
         self.aoi_name = aoi_name
+        self.mlflow_experiment_name = f"{self.aoi_name}_{date.today().strftime('%Y-%m-%d')}"
         
         mlflow.set_tracking_uri("http://127.0.0.1:5000")
         mlflow.set_experiment(self.mlflow_experiment_name)
         
-        self.forecast_models_dir = "/Users/aycha.tammour/geospatial_mlops/forecasting_models"
+        self.forecast_models_dir = "./forecasting_models"
         if not os.path.exists(self.forecast_models_dir):
             os.makedirs(self.forecast_models_dir)
 
