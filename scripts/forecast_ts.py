@@ -224,20 +224,11 @@ class ForecastTS:
         # add a forecasting date column to the forecast table
         forecast_date = date.today().strftime('%Y-%m-%d')
         forecast['forecast_date'] = forecast_date
-        # add area of interest column to the forecast table
         forecast['aoi_name'] = self.aoi_name
 
-        table = pa.Table.from_pandas(forecast)
+        s3_path = f's3://{self.bucket_name}/forecasts/{experiment_name}/xgb_forecast_{self.aoi_name}_{forecast_date}.parquet'
 
-        file_name = f"xgb_forecast_{self.aoi_name}_{date.today().strftime('%Y-%m-%d')}"
-        dir_name = f"forecasts/{experiment_name}"
-        s3_path = f's3://{self.bucket_name}/{dir_name}/{file_name}.parquet'
-
-        ds.write_dataset(table,
-                         base_dir=s3_path,
-                         format="parquet",
-                         partitioning=["forecast_date", "aoi_name"],
-                         existing_data_behavior="overwrite_or_ignore")
+        forecast.to_parquet(s3_path, index=False)
         
         # forecast.to_parquet(s3_path, index=False)
         print(f"Forecast saved to: {s3_path}")
