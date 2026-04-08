@@ -44,48 +44,72 @@ class DataReader:
         return results_df
     
     def read_forecasts(self, 
-                       exp_name: str,
-                       aoi_name: str,
+                       exp_name: str, 
+                       aoi_name: str, 
                        forecast_date: str) -> pd.DataFrame:
-        """Read the forecast data from S3 as a pandas dataframe
-        Parameters:
-        ----------
-        exp_name: str
-            The name of the experiment to filter the data by.
-        aoi_name: str
-            The name of the area of interest to filter the data by.
-        forecast_date: str
-            The date of the forecast to filter the data by.
-        Returns:
-        -------
-        pd.DataFrame
-            The DataFrame containing the loaded forecast data.
-        """
+        """Read the forecast data from S3 as a pandas dataframe"""
 
-        if not forecast_date == 'latest':
+        s3_glob = f"s3://{self.bucket_name}/forecasts/{exp_name}/*.parquet"
+
+        if forecast_date != 'latest':
             query = """
-            SELECT *
-            FROM read_parquet(? || ? || '/**/*.parquet')
-            WHERE aoi_name = ?
-            AND forecast_date = ?
+                SELECT *
+                FROM read_parquet(?)
+                WHERE aoi_name = ?
+                AND forecast_date = ?
             """
-            params = [f's3://{self.bucket_name}/', 'forecasts', exp_name, aoi_name, forecast_date]
-            results_df = self.conn.execute(query, params).df()
-            print(f"Forecast data loaded: {results_df.shape}")
-
+            params = [s3_glob, aoi_name, forecast_date]
         else:
             query = """
-            WITH latest AS (
-                SELECT MAX(forecast_date) AS latest_date
-                FROM read_parquet(? || ? || '/**/*.parquet')
-            )
-            SELECT *
-            FROM read_parquet(? || ? || '/**/*.parquet') AS forecasts
-            JOIN latest
-            ON forecasts.forecast_date = latest.latest_date
+                SELECT *
+                FROM read_parquet(?)
+                WHERE aoi_name = ?
+                AND forecast_date = (
+                    SELECT MAX(forecast_date)
+                    FROM read_parquet(?)
+                    WHERE aoi_name = ?
+                )
             """
-            params = [f's3://{self.bucket_name}/', 'forecasts', f's3://{self.bucket_name}/', 'forecasts']
-            results_df = self.conn.execute(query, params).df()
-            print(f"Forecast data loaded: {results_df.shape}")
+            params = [s3_glob, aoi_name, s3_glob, aoi_name]
 
+        results_df = self.conn.execute(query, params).df()
+        print(f"Forecast data loaded: {results_df.shape}")
         return results_df
+    
+    def format_ts_data(self, input_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Format the input DataFrame for forecasting using MLForecast
+        
+        Parameters
+        ----------
+        input_df: pd.DataFrame
+            The input DataFrame containing the time series data. 
+            It should have a 'time' column and one or more columns 
+            corresponding to the target variable and features.
+        
+        Returns
+        -------
+        pd.DataFrame
+            A formatted DataFrame suitable for use with MLForecast, 
+            containing columns 'ds', 'y', and 'unique_id'.
+        """
+
+        if 'time' not in input_df.columns:
+            input_df.reset_index(inplace=True)
+
+        cols = ['ndvi', 'bsi', 'ndmi', 'nbr']
+
+        input_df = input_df.rename(columns={f"{col}_smooth": col for col in cols})
+        
+        dfs = []
+        for col in cols:          # iterate only over index columns, not 'time'
+            temp_df = pd.DataFrame({
+                'ds':        input_df['time'],
+                'y':         input_df[col],
+                'unique_id': col,
+            })
+            dfs.append(temp_df)
+
+        output_df = pd.concat(dfs, ignore_index=True)
+            
+        return output_df
