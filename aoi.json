@@ -4,6 +4,26 @@
         {"type": "Feature",
         "geometry": {
             "type": "Point",
+            "coordinates": [-80.43463422567645, 43.40658751625569] 
+        },
+        "properties": {
+            "name": "kitchener_waterloo",
+            "application": "urban",
+            "buffer_meters": 5000
+    }},
+        {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-65.16685507985412, 44.885331324553306] 
+        },
+        "properties": {
+            "name": "cogs_lawrencetown",
+            "application": "cogs",
+            "buffer_meters": 4000
+    }},
+        {"type": "Feature",
+        "geometry": {
+            "type": "Point",
             "coordinates": [36.688, 36.310]
         },
         "properties": {

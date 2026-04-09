@@ -1,17 +1,10 @@
 """
 scripts to analyze the downloaded data
-forecast time series
-compute statistics
-hotspot detection in images
 """
-import os
+
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
-import duckdb
 import pandas as pd
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 class DataAnalysis:
@@ -19,59 +12,7 @@ class DataAnalysis:
     Class to analyze the time series data.
     """
     def __init__(self):
-
-        self.bucket_name = os.getenv('S3_BUCKET_NAME')
-        self.dir_name = 'spectral_indices_ts'
-        self.conn = duckdb.connect()
-
-        self.conn.execute("""CREATE SECRET (
-                                            TYPE s3,
-                                            PROVIDER credential_chain
-                                            );
-                        """)
-
-        self.conn.execute("LOAD spatial;")
-
-
-    def compute_statistics(self, aoi_name: str,
-                        start_date: None | str = None) -> pd.DataFrame:
-        """
-        Compute statistics for the time series data.
-
-        Parameters:
-        ----------
-        aoi_name: str
-            The name of the area of interest.
-        start_date: str, optional
-            The start date for the time series data in the format 'YYYY-MM-DD'.
-        Returns:
-        -------
-        pd.DataFrame
-            A DataFrame containing the mean, 
-            standard deviation, minimum, and maximum of the NDVI values for the specified area of interest and time range.
-        
-        Example usage:
-        --------------
-        >>> da = DataAnalysis()
-        >>> stats_df = da.compute_statistics('qastal_maaf', '2020-01-01')
-        """
-
-        query = f"""
-                SELECT 
-                    AVG(ndvi) AS mean,
-                    STDDEV(ndvi) AS stddev,
-                    MIN(ndvi) AS min,
-                    MAX(ndvi) AS max
-                FROM read_parquet('s3://{self.bucket_name}/{self.dir_name}/*.parquet')
-                WHERE aoi_name = ?
-                AND time > ?
-                """
-
-        params = (aoi_name, start_date if start_date else '2018-01-01')
-        
-        stats = self.conn.execute(query, params).df()
-        
-        return stats
+        pass
     
     @staticmethod
     def set_index_time(data_df: pd.DataFrame) -> pd.DataFrame:
@@ -79,11 +20,12 @@ class DataAnalysis:
         Set the index of the DataFrame to the 'time' column for time series analysis.
         And sort the DataFrame by the index to ensure chronological order.
 
-        Parameters:
+        Parameters
         ----------
         data_df: pd.DataFrame
             The DataFrame containing a 'time' column.
-        Returns:
+        
+        Returns
         -------
         pd.DataFrame
             The input DataFrame with the index set to the 'time' column.
@@ -95,61 +37,81 @@ class DataAnalysis:
     
     
     @staticmethod
-    def preprocess_time_series(spectral_index: str, 
-                               data_df: pd.DataFrame) -> pd.Series:
+    def preprocess_time_series(spectral_index: list[str], 
+                               data_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Preprocess the time series data for forecasting.
+        + Preprocess the time series data for forecasting.
+        + Resample time series on a weekly basis.
+        + Interpolate to fill in missing values using time.
+        + Smooth the specified spectral index columns in the DataFrame.
 
-        Parameters:
+        Parameters
         ----------
-        spectral_index: str
-            The name of the spectral index to preprocess (e.g., 'ndvi').
+        spectral_index: list[str]
+            A list of spectral indices to preprocess (e.g., ['ndvi', 'evi']).
         data_df: pd.DataFrame
-            The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
-        Returns:
+            The DataFrame containing the time series data with a 'time' column and the specified spectral index columns.
+        
+        Returns
         -------
-        pd.Series
-            A preprocessed time series of the specified spectral index, indexed by time.
+        smoothed_df: pd.DataFrame
+            A DataFrame containing the preprocessed time series of the specified spectral indices, indexed by time.
+        
+        Example usage:
+        --------------
+        >>> da = DataAnalysis()
+        >>> preprocessed_df = preprocess_time_series(['ndvi', 'bsi'], raw_data_df)
         """
+        if not isinstance(data_df.index, pd.DatetimeIndex):
+            if 'time' not in data_df.columns:
+                raise ValueError("The DataFrame must contain a 'time' column for preprocessing.")
+            else:
+                data_df = DataAnalysis.set_index_time(data_df)
 
-        data_df = DataAnalysis.set_index_time(data_df)
+        for index in spectral_index:
+            if index not in data_df.columns:
+                raise ValueError(f"Spectral index '{index}' not found in the DataFrame columns.")  
+        
+        smoothed_df = pd.DataFrame()
 
-        # Resample the data to a regular interval of one week and compute the mean for each interval
-        spec_indx_resampled = data_df[spectral_index].resample('7d').mean()
+        for indx in spectral_index:
+            smoothed_df[f"{indx}_smooth"] = (data_df[indx]
+                                            .resample('W').mean()
+                                            .interpolate(method='time', limit_direction='both')
+                                            .rolling(window=2, center=True, min_periods=1).mean()
+                                            )
 
-        # Apply a rolling mean with a window of 3 to smooth the time series
-        spec_indx_smoothed = spec_indx_resampled.rolling(window=3,
-                                                         center=True).mean()
-
-        return spec_indx_smoothed
+        return smoothed_df
     
     @staticmethod
     def check_stationarity(spectral_index: str, 
                            data_df: pd.DataFrame) -> bool:
         """
         Check the stationarity of the time series data using the Augmented Dickey-Fuller test.
-        Parameters:
+        
+        Parameters
         ----------
         spectral_index: str
             The name of the spectral index to check (e.g., 'ndvi').
         data_df: pd.DataFrame
             The DataFrame containing the time series data with a 'time' column and the specified spectral index column.
-        Returns:
+        
+        Returns
         -------
-        bool
+        stationary: bool
             True if the time series is stationary, False otherwise.
         """
 
-        data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, data_df)
-
+        data_df_smoothed = DataAnalysis.preprocess_time_series([spectral_index], data_df)
+ 
         # Require at least a few non-NaN observations and non-constant values
-        if len(data_df_smoothed.dropna()) < 3 or data_df_smoothed.dropna().nunique() < 2:
+        if len(data_df_smoothed[f"{spectral_index}_smooth"].dropna()) < 3 or data_df_smoothed[f"{spectral_index}_smooth"].dropna().nunique() < 2:
             raise ValueError(
                 f"Not enough valid data to perform stationarity check for '{spectral_index}'. "
                 "After preprocessing, the series has fewer than 3 non-NaN points or is constant."
             )
 
-        result = adfuller(data_df_smoothed.dropna(), autolag='AIC')
+        result = adfuller(data_df_smoothed[f"{spectral_index}_smooth"].dropna(), autolag='AIC')
 
         adf_results = {"ADF Statistic": result[0],
                        "p-value": result[1],
@@ -170,7 +132,6 @@ class DataAnalysis:
                     seasonality_period: int = 13):
         """
         Decompose the time series data into trend, seasonal, and residual components.
-
         Parameters:
         ----------
         spectral_index: str
@@ -190,7 +151,7 @@ class DataAnalysis:
         >>> decomposition.plot();
         """
 
-        data_df_smoothed = DataAnalysis.preprocess_time_series(spectral_index, 
+        data_df_smoothed = DataAnalysis.preprocess_time_series([spectral_index], 
                                                                data_df)
 
         decomposition = seasonal_decompose(data_df_smoothed.dropna(), 
