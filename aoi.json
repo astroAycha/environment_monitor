@@ -4,7 +4,7 @@
         {"type": "Feature",
         "geometry": {
             "type": "Point",
-            "coordinates": [-80.49922146104619, 43.44612754795889] 
+            "coordinates": [-80.43463422567645, 43.40658751625569] 
         },
         "properties": {
             "name": "kitchener_waterloo",
