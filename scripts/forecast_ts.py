@@ -28,7 +28,6 @@ from sklearn.metrics import (mean_absolute_percentage_error,
                              root_mean_squared_error, 
                              mean_absolute_error)
 
-
 class ForecastTS:
     """Forecast time series"""
 
@@ -95,7 +94,7 @@ class ForecastTS:
                 13: [(rolling_mean, 4), (rolling_std, 13)],
                 52: [(rolling_mean, 4)],
             },
-            date_features=['quarter'],  # year removed — adds spurious trend
+            date_features=['quarter'], 
         )
 
     def forecast_xgb(self,
@@ -128,8 +127,7 @@ class ForecastTS:
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
             }
 
-            mf = self._get_mlforecast(XGBRegressor(**params, 
-                                                #    early_stopping_rounds=50, 
+            mf = self._get_mlforecast(XGBRegressor(**params,
                                                    verbosity=0))
 
             cv = mf.cross_validation(input_data, n_windows=3, h=forecast_horizon)
@@ -147,7 +145,9 @@ class ForecastTS:
             return mae
 
         # Wrap the whole study in a parent run
-        with mlflow.start_run(run_name=f"{self.aoi_name}_{date.today().strftime('%Y-%m-%d %H:%M:%S')}"):
+        
+        time_stamp = date.today().strftime('%Y-%m-%d %H:%M:%S')
+        with mlflow.start_run(run_name=f"{self.aoi_name}_{time_stamp}"):
             study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=100, show_progress_bar=True)
 
@@ -167,9 +167,9 @@ class ForecastTS:
             mf_best.fit(input_data)
 
             # save full MLForecast object
-            with open(os.path.join(self.forecast_models_dir, "mf_best.pkl"), "wb") as f:
+            with open(os.path.join(self.forecast_models_dir, f"mf_best_{self.mlflow_experiment_name}.pkl"), "wb") as f:
                 pickle.dump(mf_best, f)
-            mlflow.log_artifact(os.path.join(self.forecast_models_dir, "mf_best.pkl"))
+            mlflow.log_artifact(os.path.join(self.forecast_models_dir, f"mf_best_{self.mlflow_experiment_name}.pkl"))
             mlflow.xgboost.log_model(mf_best.models_['XGBRegressor'], name="model")
             mlflow.log_params(best)
             mlflow.log_metric("best_mae", study.best_value)
@@ -181,6 +181,7 @@ class ForecastTS:
 
     def predict_xgb(self, 
                     experiment_name: str, 
+                    time_stamp: str,
                     forecast_horizon: int) -> pd.DataFrame:
         """
         Load the best XGBoost model from MLflow and predict future values.
@@ -189,6 +190,8 @@ class ForecastTS:
         ----------
         experiment_name: str
             The name of the MLflow experiment where the model was logged.
+        time_stamp: str
+            The timestamp of the model run to load.
         forecast_horizon: int
             The number of future time steps to forecast.
         
@@ -211,7 +214,7 @@ class ForecastTS:
         print(best_run["artifact_uri"])
 
         # Build local path to the model artifact
-        pkl_path = os.path.join(self.forecast_models_dir, "mf_best.pkl")
+        pkl_path = os.path.join(self.forecast_models_dir, f"mf_best_{self.mlflow_experiment_name}.pkl")
         print("4. loading pickle from:", pkl_path)
 
         print("5. loading pickle...")
