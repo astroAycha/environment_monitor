@@ -21,7 +21,8 @@ import optuna
 import mlflow.xgboost
 from mlforecast import MLForecast
 from mlforecast.target_transforms import Differences
-from window_ops.rolling import rolling_mean
+from window_ops.rolling import rolling_mean, rolling_std
+from window_ops.ewm import ewm_mean
 from xgboost import XGBRegressor
 from sklearn.metrics import (mean_absolute_percentage_error,
                              root_mean_squared_error, 
@@ -85,16 +86,16 @@ class ForecastTS:
         return output_df
     
     def _get_mlforecast(self, model):
-
         return MLForecast(
             models=[model],
             freq='W',
-            lags=[1, 13, 52],
+            lags=[1, 2, 4, 13, 26, 52],
             lag_transforms={
-                1:  [(rolling_mean, 3)],
-                13: [(rolling_mean, 13)],
+                1:  [(rolling_mean, 4), (rolling_std, 4)],
+                13: [(rolling_mean, 4), (rolling_std, 13)],
+                52: [(rolling_mean, 4)],
             },
-            date_features=['quarter', 'year'],
+            date_features=['quarter'],  # year removed — adds spurious trend
         )
 
     def forecast_xgb(self,
@@ -120,14 +121,16 @@ class ForecastTS:
         # hyperparameter optimization with Optuna
         def objective(trial):
             params = {
-                'n_estimators': trial.suggest_int('n_estimators', 50, 500),
+                'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
                 'max_depth': trial.suggest_int('max_depth', 3, 10),
                 'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
                 'subsample': trial.suggest_float('subsample', 0.5, 1.0),
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
             }
 
-            mf = self._get_mlforecast(XGBRegressor(**params, verbosity=0))
+            mf = self._get_mlforecast(XGBRegressor(**params, 
+                                                #    early_stopping_rounds=50, 
+                                                   verbosity=0))
 
             cv = mf.cross_validation(input_data, n_windows=3, h=forecast_horizon)
             mape = mean_absolute_percentage_error(cv['y'], cv['XGBRegressor'])
