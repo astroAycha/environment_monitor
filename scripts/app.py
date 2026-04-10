@@ -81,7 +81,12 @@ with st.sidebar:
     NDMI, and NBR are extracted from satellite imagery and forecast using an 
     XGBoost model optimised with Bayesian hyperparameter search.
     
-    Use the dropdowns below to explore forecasts by country and region.
+    Please see the [GitHub repository](https://github.com/astroAycha/geospatial_mlops) 
+    for more details on the data, model, and code.
+    
+    [aychatammour.com](https://aychatammour.com)
+
+    Please use the dropdowns below to explore forecasts by country and region.
     """)
 
     st.divider()
