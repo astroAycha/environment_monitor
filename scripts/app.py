@@ -149,7 +149,7 @@ st_folium(m, height=400, use_container_width=True)
 col1, col2, col3 = st.columns(3)
 col1.metric("Region", selected_region)
 col2.metric("Forecast Horizon", f"{len(forecast_df['ds'].unique())} weeks")
-col3.metric("MAE", f"{cfg['MAE']:.4f}")
+col3.metric("MAE", f"{cfg['MAE']:.4f}*100 %")
 
 st.divider()
 
