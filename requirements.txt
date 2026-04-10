@@ -1,42 +1,24 @@
-# Geo stack (install via conda-forge, not pip)
-# rasterio, gdal, geopandas, shapely, fiona — see environment.yml
-
-# Data / ML
-dask==2026.3.0
-duckdb==1.5.2
+mlflow
+airflow
+scikit-learn
+sktime
+statsmodel
+scipy
 numpy
 pandas
-pyarrow
-scikit-learn==1.8.0     
-scipy
-statsmodels==0.14.6
-xarray==2026.4.0
-
-# Forecasting / ML
-mlforecast==1.0.31
-optuna==4.8.0
-sktime==0.40.1
-utilsforecast            
-xgboost==3.2.0
-
-# MLOps
-mlflow==3.11.1
-apache-airflow           
-
-# Geo/EO
-odc-stac                
-pystac-client==0.9.0
-planetary-computer==1.0.0
-leafmap
-
-# API / Compat (pinned to avoid pydantic v1/v2 conflicts)
-pydantic>=2.0,<3.0
-fastapi>=0.100,<0.116
-
-# Viz
+geopandas
+dask
+rasterio
+openeo
 matplotlib
 plotly
 seaborn
-
-# Utils
-python-dotenv==1.2.2
+streamlit
+plotly
+folium
+streamlit-folium
+shapely
+xgboost
+optuna
+mlflow
+pandas
