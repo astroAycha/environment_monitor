@@ -16,6 +16,7 @@ class DataReader:
         self.bucket_name = os.getenv('S3_BUCKET_NAME')
         self.dir_name = 'spectral_indices_ts'
         self.conn = duckdb.connect()
+        self.conn.execute("INSTALL spatial;")
         self.conn.execute("LOAD spatial;")
 
     def read_ts(self, aoi_name: str) -> pd.DataFrame:

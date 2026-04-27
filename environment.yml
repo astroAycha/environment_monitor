@@ -1,31 +1,53 @@
-name: geospatial_mlops_env
+name: geospatial
 channels:
   - conda-forge
   - defaults
 dependencies:
+  # --- Core ---
   - python=3.12
-  - mlflow
-  - airflow
-  - scikit-learn
-  - sktime
-  - statsmodels
-  - scipy
-  - numpy
-  - pandas
-  - pyarrow
-  - geopandas
-  - dask
+
+  # --- Geo stack (conda-forge handles C-level DLL coordination) ---
   - gdal
   - rasterio
+  - geopandas
   - shapely
+  - fiona
   - odc-stac
   - pystac-client
   - pystac=1.11.0
   - openeo
+  - planetary-computer
+  - leafmap
+
+  # --- Data / ML ---
+  - numpy
+  - pandas
+  - pyarrow
+  - scikit-learn
+  - scipy
+  - statsmodels
+  - dask
+  - xarray
+  - duckdb
+
+  # --- Viz ---
   - matplotlib
   - plotly
   - seaborn
-  - leafmap
+
+  # --- Dev/Test ---
   - pytest
-  - python-duckdb
-  - planetary-computer
+
+  # --- Pip-only packages (conda-forge doesn't package these well) ---
+  - pip
+  - pip:
+    - mlflow==3.11.1
+    - apache-airflow
+    - sktime==0.40.1
+    - mlforecast==1.0.31
+    - optuna==4.8.0
+    - xgboost==3.2.0
+    - utilsforecast         
+    - python-dotenv
+    - pydantic>=2.0,<3.0     # pin to avoid fastapi compat issues
+    - fastapi>=0.100,<0.116  # pin to known pydantic-v2 compatible range
