@@ -1,51 +1,41 @@
-# ========================================================
-# Geo stack — install via conda-forge in environment.yml
-# rasterio, gdal, geopandas, shapely, fiona, odc-stac
-# pystac-client, planetary-computer, leafmap, openeo
-# ========================================================
- 
-# --- Data / ML ---
-dask==2025.12.0
-duckdb==1.5.2
-numpy                        # let conda pin this
-pandas                       # let conda pin this
-pyarrow
-scikit-learn==1.8.0          
-scipy
-statsmodels==0.14.6
-xarray==2025.12.0
- 
-# --- Forecasting ---
-mlforecast==1.0.31
-optuna==4.8.0
-sktime==0.40.1
-utilsforecast               
-xgboost==3.2.0
- 
-# --- MLOps ---
-mlflow==3.11.1
-apache-airflow            
- 
-# --- Geo/EO ---
-odc-stac                     
-pystac-client==0.9.0
-planetary-computer==1.0.0   
-folium==0.20.0
-jsonschema==4.26.0
- 
+# ============================================================
+# Streamlit app dependencies — read by Streamlit Cloud
+# For full dev/training dependencies see requirements_dev.txt
+# ============================================================
+
 # --- App / UI ---
-streamlit==1.44.0            
-streamlit-folium==0.27.1     
- 
-# --- API / Compat ---
-pydantic>=2.0,<3.0
-fastapi>=0.100,<0.116
- 
+streamlit==1.44.0
+streamlit-folium==0.27.1
+folium==0.20.0
+
+# --- Geo ---
+geopandas
+rasterio
+shapely
+planetary-computer==1.0.0
+pystac-client==0.9.0
+odc-stac
+
+# --- Data ---
+numpy
+pandas
+pyarrow
+xarray==2025.12.0
+duckdb==1.5.2
+
+# --- ML (inference only, no training) ---
+scikit-learn==1.8.0
+xgboost==3.2.0
+mlflow==3.11.1
+
 # --- Viz ---
-matplotlib
 plotly==6.7.0
+matplotlib
 seaborn
- 
+
+# --- Compat ---
+pydantic>=2.0,<3.0
+jsonschema==4.26.0
+
 # --- Utils ---
 python-dotenv==1.2.2
- 
