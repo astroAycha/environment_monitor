@@ -1,24 +1,51 @@
-mlflow
-airflow
-scikit-learn
-sktime
-statsmodel
+# ========================================================
+# Geo stack — install via conda-forge in environment.yml
+# rasterio, gdal, geopandas, shapely, fiona, odc-stac
+# pystac-client, planetary-computer, leafmap, openeo
+# ========================================================
+ 
+# --- Data / ML ---
+dask==2025.12.0
+duckdb==1.5.2
+numpy                        # let conda pin this
+pandas                       # let conda pin this
+pyarrow
+scikit-learn==1.8.0          
 scipy
-numpy
-pandas
-geopandas
-dask
-rasterio
-openeo
+statsmodels==0.14.6
+xarray==2025.12.0
+ 
+# --- Forecasting ---
+mlforecast==1.0.31
+optuna==4.8.0
+sktime==0.40.1
+utilsforecast               
+xgboost==3.2.0
+ 
+# --- MLOps ---
+mlflow==3.11.1
+apache-airflow            
+ 
+# --- Geo/EO ---
+odc-stac                     
+pystac-client==0.9.0
+planetary-computer==1.0.0   
+folium==0.20.0
+jsonschema==4.26.0
+ 
+# --- App / UI ---
+streamlit==1.44.0            
+streamlit-folium==0.27.1     
+ 
+# --- API / Compat ---
+pydantic>=2.0,<3.0
+fastapi>=0.100,<0.116
+ 
+# --- Viz ---
 matplotlib
-plotly
+plotly==6.7.0
 seaborn
-streamlit
-plotly
-folium
-streamlit-folium
-shapely
-xgboost
-optuna
-mlflow
-pandas
+ 
+# --- Utils ---
+python-dotenv==1.2.2
+ 
