@@ -4,20 +4,22 @@
         {"type": "Feature",
         "geometry": {
             "type": "Point",
-            "coordinates": [-80.43463422567645, 43.40658751625569] 
+            "coordinates": [-80.435, 43.407] 
         },
         "properties": {
-            "name": "kitchener_waterloo",
+            "country": "canada",
+            "aoi_id": "kitchener_waterloo",
             "application": "urban",
             "buffer_meters": 5000
     }},
         {"type": "Feature",
         "geometry": {
             "type": "Point",
-            "coordinates": [-65.16685507985412, 44.885331324553306] 
+            "coordinates": [-65.167, 44.885] 
         },
         "properties": {
-            "name": "cogs_lawrencetown",
+            "country": "canada",
+            "aoi_id": "cogs_lawrencetown",
             "application": "cogs",
             "buffer_meters": 4000
     }},
@@ -27,7 +29,8 @@
             "coordinates": [36.688, 36.310]
         },
         "properties": {
-            "name": "atamah_camp",
+            "country": "syria",
+            "aoi_id": "atamah_camp",
             "application": "refugee_camps",
             "buffer_meters": 4000
     }},
@@ -37,7 +40,8 @@
             "coordinates": [35.952, 34.824]
         },
         "properties": {
-            "name": "qastal_maaf",
+            "country": "syria",
+            "aoi_id": "qastal_maaf",
             "application": "wildfires",
             "buffer_meters": 3000
     }},
@@ -47,9 +51,43 @@
             "coordinates": [36.102, 32.887]
         },
         "properties": {
-            "name": "near_nuwa",
+            "country": "syria",
+            "aoi_id": "near_nuwa",
             "application": "soil_moisture",
             "buffer_meters": 4000
-    }} 
+    }},
+    {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-79.399, 43.667]
+        },
+        "properties": {
+            "country": "canada",
+            "aoi_id": "toronto",
+            "application": "urban",
+            "buffer_meters": 4000
+    }},
+    {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-118.072, 52.868]
+        },
+        "properties": {
+            "country": "canada",
+            "aoi_id": "jasper",
+            "application": "wildfires",
+            "buffer_meters": 20000
+    }},
+    {"type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [88.599, 24.374]
+        },
+        "properties": {
+            "country": "bangladesh",
+            "aoi_id": "rajashahi",
+            "application": "droughts",
+            "buffer_meters": 4000
+    }}
     ]
 }
