@@ -55,8 +55,8 @@ class DataDownload():
 
         self.conn = duckdb.connect()
 
-    def define_bbox(self, 
-                    lat: float,
+    @staticmethod
+    def define_bbox(lat: float,
                     lon: float,
                     rad: float) -> list:
         """
