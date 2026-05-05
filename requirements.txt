@@ -1,42 +1,42 @@
-# Geo stack (install via conda-forge, not pip)
-# rasterio, gdal, geopandas, shapely, fiona — see environment.yml
+# ============================================================
+# Streamlit app dependencies — read by Streamlit Cloud
+# For full dev/training dependencies see requirements_dev.txt
+# ============================================================
 
-# Data / ML
-dask==2026.3.0
-duckdb==1.5.2
+# --- App / UI ---
+streamlit==1.44.0
+streamlit-folium==0.27.1
+folium==0.20.0
+
+# --- Geo ---
+geopandas
+rasterio
+shapely
+planetary-computer==1.0.0
+pystac-client==0.9.0
+odc-stac
+
+# --- Data ---
 numpy
 pandas
 pyarrow
-scikit-learn==1.8.0     
-scipy
-statsmodels==0.14.6
-xarray==2026.4.0
+xarray==2025.12.0
+duckdb==1.5.2
 
-# Forecasting / ML
-mlforecast==1.0.31
-optuna==4.8.0
-sktime==0.40.1
-utilsforecast            
+# --- ML (inference only, no training) ---
+scikit-learn==1.8.0
 xgboost==3.2.0
-
-# MLOps
 mlflow==3.11.1
-apache-airflow           
+statsmodels==0.14.6
 
-# Geo/EO
-odc-stac                
-pystac-client==0.9.0
-planetary-computer==1.0.0
-leafmap
-
-# API / Compat (pinned to avoid pydantic v1/v2 conflicts)
-pydantic>=2.0,<3.0
-fastapi>=0.100,<0.116
-
-# Viz
+# --- Viz ---
+plotly==6.7.0
 matplotlib
-plotly
 seaborn
 
-# Utils
+# --- Compat ---
+pydantic>=2.0,<3.0
+jsonschema==4.26.0
+
+# --- Utils ---
 python-dotenv==1.2.2
