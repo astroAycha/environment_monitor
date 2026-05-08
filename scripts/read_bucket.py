@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "environment-monitor")
 
 
 class DataReader:
@@ -43,7 +43,7 @@ class DataReader:
         return f"s3://{BUCKET_NAME}/{self.country}/{aoi_name}/ts/*.parquet"
 
     def _ml_prefix(self, aoi_name: str) -> str:
-        return f"{self.country}/{aoi_name}/ml/"
+        return f"s3://{BUCKET_NAME}/{self.country}/{aoi_name}/ml/"
 
     # ------------------------------------------------------------------
     # AOI metadata
