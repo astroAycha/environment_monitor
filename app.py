@@ -218,9 +218,11 @@ SECTION_TITLE = {
     "marginBottom": "8px",
 }
 
-registry = load_aois()
-aoi_options = get_aoi_options(registry)
-default_aoi = aoi_options[0]["value"] if aoi_options else None
+# AOIs are loaded on first page request via callback, not at startup,
+# so that HF Spaces secrets are available when the S3 call is made.
+registry = {}
+aoi_options = []
+default_aoi = None
 
 app.layout = html.Div([
 
@@ -258,9 +260,10 @@ app.layout = html.Div([
                 html.Div("Area of interest", style=SECTION_TITLE),
                 dcc.Dropdown(
                     id="aoi-dropdown",
-                    options=aoi_options,
-                    value=default_aoi,
+                    options=[],
+                    value=None,
                     clearable=False,
+                    placeholder="Loading AOIs...",
                     style={"fontSize": "13px"},
                 ),
             ]),
@@ -333,6 +336,24 @@ app.layout = html.Div([
 
 
 # ── Callbacks ──────────────────────────────────────────────────────────────────
+
+
+@callback(
+    Output("aoi-dropdown", "options"),
+    Output("aoi-dropdown", "value"),
+    Input("aoi-dropdown", "id"),   # fires once on page load
+)
+def populate_aoi_dropdown(_):
+    """Load AOI list from S3 on first page request when secrets are available."""
+    try:
+        reg = load_aois()
+        opts = get_aoi_options(reg)
+        default = opts[0]["value"] if opts else None
+        return opts, default
+    except Exception as e:
+        print(f"Could not populate AOI dropdown: {e}")
+        return [], None
+
 
 @callback(
     Output("store-ts",       "data"),
