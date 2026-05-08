@@ -2,8 +2,10 @@
 
 import json
 import datetime
+import os
 
 import boto3
+import dotenv
 import duckdb
 import pandas as pd
 
@@ -12,7 +14,13 @@ from scripts.forecast_ts import ForecastTS
 from scripts.process_ts import DataAnalysis
 from scripts.read_bucket import DataReader
 
-BUCKET_NAME = "env_monitor"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+
+print(f"Using S3 bucket: {BUCKET_NAME}")
 
 
 class Pipeline:
@@ -20,11 +28,11 @@ class Pipeline:
     End-to-end ML pipeline for a single AOI.
 
     S3 structure assumed:
-        s3://env_monitor/aois.json
-        s3://env_monitor/{country}/{aoi_name}/ts/*.parquet
-        s3://env_monitor/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
-        s3://env_monitor/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
-        s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
+        s3://{BUCKET_NAME}/aois.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ts/*.parquet
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
     """
 
     def __init__(self,
@@ -64,7 +72,7 @@ class Pipeline:
         """
         Add or update this AOI's entry in the top-level aois.json registry.
 
-        Reads s3://env_monitor/aois.json, upserts this AOI under its
+        Reads s3://{BUCKET_NAME}/aois.json, upserts this AOI under its
         country key, and writes the file back.
 
         Parameters

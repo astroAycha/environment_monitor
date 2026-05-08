@@ -33,8 +33,8 @@ logging.basicConfig(
     level=logging.INFO,
     filemode='a')
 
-#TODO: Make this env var and add to .env file
-BUCKET_NAME = os.getenv("BUCKET_NAME", "env_monitor")
+
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
 
 class DataDownload():
