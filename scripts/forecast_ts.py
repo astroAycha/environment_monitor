@@ -1,125 +1,212 @@
 """Forecast time series"""
 
+import json
+import os
+import pickle
 from datetime import datetime, date, timezone
+
+import mlflow
+import mlflow.xgboost
+import optuna
+import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
-import pickle
-import pandas as pd
-import mlflow
-import os
-from scripts.process_ts import DataAnalysis
-from sktime.split import temporal_train_test_split
-from sktime.forecasting.base import ForecastingHorizon
-from sktime.forecasting.exp_smoothing import ExponentialSmoothing
-from sktime.forecasting.all import mean_squared_error
-from sktime.performance_metrics.forecasting import (mean_absolute_percentage_error, 
-                                                    mean_absolute_error)
-from sktime.forecasting.online_learning import (NormalHedgeEnsemble,
-                                                OnlineEnsembleForecaster)
-
-import optuna
-import mlflow.xgboost
+from dotenv import load_dotenv
 from mlforecast import MLForecast
-from mlforecast.target_transforms import Differences
-from mlforecast.lag_transforms import RollingMean, RollingStd, ExponentiallyWeightedMean
-
+from mlforecast.lag_transforms import ExponentiallyWeightedMean, RollingMean, RollingStd
+from sklearn.metrics import (mean_absolute_error,
+                             mean_absolute_percentage_error,
+                             root_mean_squared_error)
+from sktime.performance_metrics.forecasting import (mean_absolute_error,
+                                                    mean_absolute_percentage_error)
 from xgboost import XGBRegressor
-from sklearn.metrics import (mean_absolute_percentage_error,
-                             root_mean_squared_error, 
-                             mean_absolute_error)
+
+from scripts.process_ts import DataAnalysis
+
+load_dotenv()
+
+# TODO: move this to a config file or environment variable
+BUCKET_NAME = os.getenv("BUCKET_NAME", "env_monitor")
+
 
 class ForecastTS:
-    """Forecast time series"""
+    """
+    Forecast time series and persist model artifacts to S3.
+
+    S3 structure written by this class:
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
+    """
 
     def __init__(self,
-                 aoi_name: str):
-        
+                 aoi_name: str,
+                 country: str):
+
         self.aoi_name = aoi_name
-        self.mlflow_experiment_name = f"{self.aoi_name}_{datetime.now(timezone.utc).strftime('%Y-%m-%d_%H-%M')}"
-        
+        self.country = country
+        self.mlflow_experiment_name = (
+            f"{self.aoi_name}_{datetime.now(timezone.utc).strftime('%Y-%m-%d_%H-%M')}"
+        )
+
         mlflow.set_tracking_uri("http://127.0.0.1:5000")
         mlflow.set_experiment(self.mlflow_experiment_name)
-        
+
         self.forecast_models_dir = "./forecasting_models"
         if not os.path.exists(self.forecast_models_dir):
             os.makedirs(self.forecast_models_dir)
 
-        self.bucket_name = os.getenv("S3_BUCKET_NAME")
+    def _ml_s3_prefix(self) -> str:
+        """Base S3 prefix for all ML artifacts for this AOI."""
+        return f"s3://{BUCKET_NAME}/{self.country}/{self.aoi_name}/ml"
+
+    def _model_s3_path(self, run_date: str) -> str:
+        return f"{self._ml_s3_prefix()}/model_{self.aoi_name}_{run_date}.pkl"
+
+    def _metrics_s3_path(self, run_date: str) -> str:
+        return f"{self._ml_s3_prefix()}/metrics_{self.aoi_name}_{run_date}.json"
+
+    def _forecast_s3_path(self, run_date: str) -> str:
+        return f"{self._ml_s3_prefix()}/forecast_{self.aoi_name}_{run_date}.parquet"
 
     @staticmethod
     def format_input_data(input_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Format the input DataFrame for forecasting using MLForecast
-        
+        Format the input DataFrame for forecasting using MLForecast.
+
         Parameters
         ----------
         input_df: pd.DataFrame
-            The input DataFrame containing the time series data. 
-            It should have a 'time' column and one or more columns 
-            corresponding to the target variable and features.
-        
+            DataFrame with a 'time' column and spectral index columns.
+
         Returns
         -------
         pd.DataFrame
-            A formatted DataFrame suitable for use with MLForecast, 
-            containing columns 'ds', 'y', and 'unique_id'.
+            Formatted DataFrame with columns 'ds', 'y', and 'unique_id'.
         """
-
         cols = [col for col in input_df.columns if col != 'time']
 
         da = DataAnalysis()
         process_data = da.preprocess_time_series(cols, input_df)
-        
+
         dfs = []
         for _, col in enumerate(process_data.columns):
             uid = col.split("_")[0]
             temp_df = pd.DataFrame({
-                                    'ds': process_data.index,
-                                    'y': process_data[col],
-                                    'unique_id': uid
-                                            })
+                'ds': process_data.index,
+                'y': process_data[col],
+                'unique_id': uid
+            })
             dfs.append(temp_df)
 
-        output_df = pd.concat(dfs, ignore_index=True)
-            
-        return output_df
-    
-    def _get_mlforecast(self, model):
+        return pd.concat(dfs, ignore_index=True)
+
+    def _get_mlforecast(self, model) -> MLForecast:
         return MLForecast(
             models=[model],
             freq='W',
             lags=[1, 2, 4, 13, 26, 52],
             lag_transforms={
-                # RollingMean(window_size=7)
                 1:  [RollingMean(window_size=4), RollingStd(window_size=4)],
                 13: [RollingMean(window_size=13), RollingStd(window_size=13)],
                 52: [RollingMean(window_size=52), RollingStd(window_size=52)],
-                
             },
-            date_features=['quarter'], 
+            date_features=['quarter'],
         )
+
+    def _write_metrics(self,
+                       run_date: str,
+                       best_params: dict,
+                       best_mae: float,
+                       cv_results: pd.DataFrame) -> None:
+        """
+        Build a metrics JSON and write it to S3.
+
+        Schema
+        ------
+        {
+            "aoi_name": str,
+            "country": str,
+            "run_date": str,
+            "experiment_name": str,
+            "best_params": dict,
+            "metrics": {
+                "mae": float,
+                "rmse": float,
+                "mape": float
+            },
+            "cv_windows": int
+        }
+
+        Parameters
+        ----------
+        run_date : str
+            ISO date string for today (YYYY-MM-DD).
+        best_params : dict
+            Best hyperparameters found by Optuna.
+        best_mae : float
+            Best cross-validated MAE from the Optuna study.
+        cv_results : pd.DataFrame
+            Cross-validation predictions DataFrame from MLForecast.
+        """
+        rmse = root_mean_squared_error(cv_results['y'], cv_results['XGBRegressor'])
+        mape = mean_absolute_percentage_error(cv_results['y'], cv_results['XGBRegressor'])
+
+        metrics_payload = {
+            "aoi_name": self.aoi_name,
+            "country": self.country,
+            "run_date": run_date,
+            "experiment_name": self.mlflow_experiment_name,
+            "best_params": best_params,
+            "metrics": {
+                "mae": round(best_mae, 6),
+                "rmse": round(float(rmse), 6),
+                "mape": round(float(mape), 6),
+            },
+            "cv_windows": 3,
+        }
+
+        import boto3, io
+        s3 = boto3.client("s3")
+        bucket = BUCKET_NAME
+        key = (
+            f"{self.country}/{self.aoi_name}/ml/"
+            f"metrics_{self.aoi_name}_{run_date}.json"
+        )
+        s3.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=json.dumps(metrics_payload, indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
+        print(f"Metrics written to: s3://{bucket}/{key}")
 
     def forecast_xgb(self,
                      input_data: pd.DataFrame,
                      forecast_horizon: int) -> pd.DataFrame:
         """
-        Forecast using XGBoost model.
-        
+        Train an XGBoost forecaster with Optuna hyperparameter search,
+        persist model + metrics + forecast to S3, and return the forecast.
+
+        Writes to S3:
+            ml/model_{aoi_name}_{date}.pkl
+            ml/metrics_{aoi_name}_{date}.json
+            ml/forecast_{aoi_name}_{date}.parquet
+
         Parameters
         ----------
         input_data: pd.DataFrame
-            The input DataFrame containing the time series data. 
-            It should have a DatetimeIndex and columns corresponding to the target variable and features.
+            Formatted DataFrame with columns 'ds', 'y', 'unique_id'.
         forecast_horizon: int
-            The number of future time steps to forecast.
+            Number of future weekly steps to forecast.
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the forecasted values for the specified horizon.
+            Forecast DataFrame.
         """
-    
-        # hyperparameter optimization with Optuna
+        run_date = date.today().strftime('%Y-%m-%d')
+
         def objective(trial):
             params = {
                 'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
@@ -129,166 +216,131 @@ class ForecastTS:
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
             }
 
-            mf = self._get_mlforecast(XGBRegressor(**params,
-                                                   verbosity=0))
-
+            mlf = self._get_mlforecast(XGBRegressor(**params, verbosity=0))
             cv = mf.cross_validation(input_data, n_windows=3, h=forecast_horizon)
-            mape = mean_absolute_percentage_error(cv['y'], cv['XGBRegressor'])
-            rmse = root_mean_squared_error(cv['y'], cv['XGBRegressor'])
-            mae = mean_absolute_error(cv['y'], cv['XGBRegressor'])
 
-            # Log each trial as its own MLflow run
+            mae = mean_absolute_error(cv['y'], cv['XGBRegressor'])
+            rmse = root_mean_squared_error(cv['y'], cv['XGBRegressor'])
+            mape = mean_absolute_percentage_error(cv['y'], cv['XGBRegressor'])
+
             with mlflow.start_run(nested=True):
                 mlflow.log_params(params)
-                mlflow.log_metric("mape", mape)
-                mlflow.log_metric("rmse", rmse)
                 mlflow.log_metric("mae", mae)
+                mlflow.log_metric("rmse", rmse)
+                mlflow.log_metric("mape", mape)
 
             return mae
 
-        # Wrap the whole study in a parent run
-        
-        time_stamp = date.today().strftime('%Y-%m-%d %H:%M:%S')
-        with mlflow.start_run(run_name=f"{self.aoi_name}_{time_stamp}"):
+        with mlflow.start_run(run_name=f"{self.aoi_name}_{run_date}"):
             study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=100, show_progress_bar=True)
 
-            # Log best results to the parent run
             mlflow.log_params({f"best_{k}": v for k, v in study.best_params.items()})
             mlflow.log_metric("best_mae", study.best_value)
 
-            print("Best MAE:  ", study.best_value)
-            print("Best params:", study.best_params)
+            print(f"Best MAE:    {study.best_value}")
+            print(f"Best params: {study.best_params}")
 
-        # Refit best model and log it
+        # Refit on full dataset with best params
         with mlflow.start_run(run_name=f"{self.aoi_name}_best_model"):
             best = study.best_params
 
-            mf_best = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
+            mlf_best = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
+            mlf_best.fit(input_data)
 
-            mf_best.fit(input_data)
+            # Run CV once more with best params to get metrics for the JSON
+            cv_best = mlf_best.cross_validation(input_data, n_windows=3, h=forecast_horizon)
 
-            # save full MLForecast object
-            with open(os.path.join(self.forecast_models_dir, f"mf_best_{self.mlflow_experiment_name}.pkl"), "wb") as f:
-                pickle.dump(mf_best, f)
-            mlflow.log_artifact(os.path.join(self.forecast_models_dir, f"mf_best_{self.mlflow_experiment_name}.pkl"))
-            mlflow.xgboost.log_model(mf_best.models_['XGBRegressor'], name="model")
+            # --- persist model pickle to S3 ---
+            local_pkl = os.path.join(
+                self.forecast_models_dir,
+                f"model_{self.aoi_name}_{run_date}.pkl"
+            )
+            with open(local_pkl, "wb") as f:
+                pickle.dump(mlf_best, f)
+
+            import boto3
+            s3 = boto3.client("s3")
+            model_key = f"{self.country}/{self.aoi_name}/ml/model_{self.aoi_name}_{run_date}.pkl"
+            s3.upload_file(local_pkl, BUCKET_NAME, model_key)
+            print(f"Model written to: s3://{BUCKET_NAME}/{model_key}")
+
+            mlflow.log_artifact(local_pkl)
+            mlflow.xgboost.log_model(mlf_best.models_['XGBRegressor'], name="model")
             mlflow.log_params(best)
             mlflow.log_metric("best_mae", study.best_value)
 
-            forecast = mf_best.predict(h=forecast_horizon)
+            # --- generate forecast ---
+            forecast = mlf_best.predict(h=forecast_horizon)
+            forecast['forecast_date'] = run_date
+            forecast['aoi_name'] = self.aoi_name
+            forecast['country'] = self.country
+
+            # --- persist forecast parquet to S3 ---
+            forecast_s3 = self._forecast_s3_path(run_date)
+            forecast.to_parquet(forecast_s3, index=False)
+            print(f"Forecast written to: {forecast_s3}")
+
+            # --- persist metrics JSON to S3 ---
+            self._write_metrics(run_date, best, study.best_value, cv_best)
 
         return forecast
- 
 
-    def predict_xgb(self, 
-                    experiment_name: str, 
-                    time_stamp: str,
+    def predict_xgb(self,
                     forecast_horizon: int) -> pd.DataFrame:
         """
-        Load the best XGBoost model from MLflow and predict future values.
+        Load the latest model pickle from S3 and generate a fresh forecast.
+
+        Reads latest model from:
+            s3://env_monitor/{country}/{aoi_name}/ml/model_{aoi_name}_*.pkl
+        Writes new forecast to:
+            s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
 
         Parameters
         ----------
-        experiment_name: str
-            The name of the MLflow experiment where the model was logged.
-        time_stamp: str
-            The timestamp of the model run to load.
         forecast_horizon: int
-            The number of future time steps to forecast.
-        
+            Number of future weekly steps to forecast.
+
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the forecasted values for the specified horizon.
+            Forecast DataFrame.
         """
-        print("1. searching runs...")
-        best_run = mlflow.search_runs(
-            experiment_names=[experiment_name],
-            filter_string=f"tags.mlflow.runName = '{self.aoi_name}_best_model'",
-            order_by=["metrics.best_mae ASC"],
-            max_results=1).iloc[0]
-        print("2. found run:", best_run["run_id"])
+        import boto3
 
-        run_id = best_run["run_id"]
-        print(f"Loading model from run: {run_id}")
-        artifact_uri = best_run["artifact_uri"]
-        print(best_run["artifact_uri"])
+        run_date = date.today().strftime('%Y-%m-%d')
 
-        # Build local path to the model artifact
-        pkl_path = os.path.join(self.forecast_models_dir, f"mf_best_{self.mlflow_experiment_name}.pkl")
-        print("4. loading pickle from:", pkl_path)
+        # Find the most recent model pickle in S3
+        s3 = boto3.client("s3")
+        prefix = f"{self.country}/{self.aoi_name}/ml/model_{self.aoi_name}_"
+        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
 
-        print("5. loading pickle...")
-        with open(pkl_path, "rb") as f:
+        if 'Contents' not in response:
+            raise FileNotFoundError(
+                f"No model pickle found at s3://{BUCKET_NAME}/{prefix}*"
+            )
+
+        # Sort by LastModified to get the most recent
+        objects = sorted(response['Contents'], key=lambda o: o['LastModified'], reverse=True)
+        latest_key = objects[0]['Key']
+        print(f"Loading model from: s3://{BUCKET_NAME}/{latest_key}")
+
+        local_pkl = os.path.join(
+            self.forecast_models_dir,
+            os.path.basename(latest_key)
+        )
+        s3.download_file(BUCKET_NAME, latest_key, local_pkl)
+
+        with open(local_pkl, "rb") as f:
             mf_best = pickle.load(f)
-        print("6. pickle loaded")
 
-        print("7. predicting...")
-        # Predict directly — no fit needed
         forecast = mf_best.predict(h=forecast_horizon)
-        print("8. done")
-
-        # add a forecasting date column to the forecast table
-        forecast_date = date.today().strftime('%Y-%m-%d')
-        forecast['forecast_date'] = forecast_date
+        forecast['forecast_date'] = run_date
         forecast['aoi_name'] = self.aoi_name
+        forecast['country'] = self.country
 
-        s3_path = f's3://{self.bucket_name}/forecasts/{experiment_name}/xgb_forecast_{self.aoi_name}_{forecast_date}.parquet'
-
-        forecast.to_parquet(s3_path, index=False)
-        
-        # forecast.to_parquet(s3_path, index=False)
-        print(f"Forecast saved to: {s3_path}")
+        forecast_s3 = self._forecast_s3_path(run_date)
+        forecast.to_parquet(forecast_s3, index=False)
+        print(f"Forecast written to: {forecast_s3}")
 
         return forecast
-    
-##########################
-
-    def forecast_ensemble(self, 
-                          data_df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Perform ensemble forecasting using multiple models and log the experiment with MLflow.
-        Parameters
-        -----------
-        data_df: pd.DataFrame
-            The input DataFrame containing the time series data. 
-            It should have a DatetimeIndex and columns corresponding to the target variable and features.
-            
-        Returns
-        -------
-        pd.DataFrame            
-            A DataFrame containing the forecasted values from the ensemble model
-            """
-        if not isinstance(data_df.index, pd.DatetimeIndex):
-            raise ValueError("The index of the DataFrame must be a DatetimeIndex for time series forecasting.")
-
-        mlflow.set_tracking_uri("http://127.0.0.1:5000")
-        mlflow.set_experiment(self.mlflow_experiment_name)
-        print(f"MLflow experiment set to: {self.mlflow_experiment_name}")
-        with mlflow.start_run():
-            hedge_expert = NormalHedgeEnsemble(n_estimators=3, loss_func=mean_squared_error)
-            y_train, y_test = temporal_train_test_split(data_df, test_size=0.2)
-
-            ses = ExponentialSmoothing(sp=13)
-            holt = ExponentialSmoothing(trend="add", damped_trend=False, sp=13)
-            damped = ExponentialSmoothing(trend="add", damped_trend=True, sp=13)
-
-            forecaster = OnlineEnsembleForecaster(
-                [
-                    ("ses", ses),
-                    ("holt", holt),
-                    ("damped", damped),
-                ],
-                ensemble_algorithm=hedge_expert,
-            )
-            fh = ForecastingHorizon(y_test.index, is_relative=False)
-            forecaster.fit(y=y_train, fh=fh)
-            print(f"{forecaster.check_is_fitted()=}")
-            y_pred = forecaster.update_predict_single(y_test)
-            for _, col in enumerate(list(y_pred.columns)):
-                mlflow.log_metric(f"forecast_{col}_mape", mean_absolute_percentage_error(y_test[col], y_pred[col], symmetric=False))
-                mlflow.log_metric(f"forecast_{col}_mae", mean_absolute_error(y_test[col], y_pred[col]))
-
-
-        return y_pred

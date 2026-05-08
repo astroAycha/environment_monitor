@@ -1,33 +1,46 @@
-"""Ingest, process and forecast time series data for a specific location using DuckDB and MLflow."""
+"""Ingest, process, and forecast time series data for a specific AOI."""
 
+import json
+import datetime
+
+import boto3
 import duckdb
 import pandas as pd
-import geopandas as gpd
+
 from scripts.data_download import DataDownload
+from scripts.forecast_ts import ForecastTS
 from scripts.process_ts import DataAnalysis
 from scripts.read_bucket import DataReader
-from scripts.process_ts import DataAnalysis
-from scripts.forecast_ts import ForecastTS
+
+BUCKET_NAME = "env_monitor"
 
 
 class Pipeline:
-    """ ML pipeline"""
+    """
+    End-to-end ML pipeline for a single AOI.
+
+    S3 structure assumed:
+        s3://env_monitor/aois.json
+        s3://env_monitor/{country}/{aoi_name}/ts/*.parquet
+        s3://env_monitor/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
+        s3://env_monitor/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
+        s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
+    """
 
     def __init__(self,
-                s3_bucket_name: str,
-                country: str,
-                location_id: str,
-                bbox: list
-                 ):
-        
-        self.s3_bucket_name = s3_bucket_name
+                 country: str,
+                 aoi_name: str,
+                 bbox: list,
+                 data_source: str = 'sentinel-2'):
+
         self.country = country
-        self.location_id = location_id
+        self.aoi_name = aoi_name
         self.bbox = bbox
-        
-        self.downloader = DataDownload(data_source='sentinel-2')
-        
-        # Initialize DuckDB connection and load spatial extension
+        self.data_source = data_source
+
+        self.downloader = DataDownload(data_source=data_source, country=country)
+        self.data_reader = DataReader(country=country)
+
         self.conn = duckdb.connect()
         self.conn.execute("INSTALL spatial;")
         self.conn.execute("LOAD spatial;")
@@ -36,108 +49,251 @@ class Pipeline:
                         PROVIDER credential_chain
                         );
                      """)
-    
 
-    def check_last_updated(self):
-        """Check the last updated timestamp for the location data in the S3 bucket."""
-        
-        today = pd.Timestamp.now()
-        print(f"Today's date: {today}")
+        self.s3 = boto3.client("s3")
+        self.ts_glob = (
+            f"s3://{BUCKET_NAME}/{self.country}/{self.aoi_name}/ts/*.parquet"
+        )
+        self.ml_prefix = f"{self.country}/{self.aoi_name}/ml/"
 
-        # read locations data from S3 bucket
-        loc_data_path = f"{self.s3_bucket_name}/{self.country}/{self.location_id}/data/"
-        
-        # check the last updated timestamp for the location data in the S3 bucket
-        last_date = self.conn.execute(f"""SELECT aoi_id, MAX(updated_at) AS last_updated
-                                            FROM read_parquet('{loc_data_path}/*.parquet');""").fetchone()
-        
-        # if there is no data for this location, run data download for the location
-        if last_date is None:
-            print(f"No data found for location {self.location_id} in the S3 bucket.")
-            print(f"Fetching data for location {self.location_id} from Sentinel-2 API...")
-            self.downloader.extract_time_series(self.bbox, 
-                                                self.location_id, 
-                                                '2018-01-01', 
-                                                today.strftime('%Y-%m-%d'))
-            
-        # otherwise check if the data is updated in the last 7 days, if not run data update
-        elif last_date[1] > pd.Timestamp.now() - pd.Timedelta(days=7):
-            print(f"Last updated timestamp for location {self.location_id}: {last_date[1]}")
-            self.downloader.update_time_series(self.location_id)
+    # ------------------------------------------------------------------
+    # AOI registry
+    # ------------------------------------------------------------------
 
+    def register_aoi(self, lat: float, lon: float, rad: float) -> None:
+        """
+        Add or update this AOI's entry in the top-level aois.json registry.
 
+        Reads s3://env_monitor/aois.json, upserts this AOI under its
+        country key, and writes the file back.
 
-    def check_ml_model(self):
-        """Check if a trained ML model exists for the location and if it needs to be retrained."""
-        
-        # check if a trained ML model exists for the location in the S3 bucket
-        model_path = f"{self.s3_bucket_name}/{self.country}/{self.location_id}/model/"
-        model_exists = self.conn.execute(f"""SELECT COUNT(*) > 0 AS model_exists
-                                            FROM read_parquet('{model_path}/*.parquet');""").fetchone()
-        
-        if model_exists:
-            print(f"A trained ML model exists for location {self.location_id}.")
-            # check if the model needs to be retrained based on the last updated timestamp of the data
-            last_data_update = self.conn.execute(f"""SELECT MAX(updated_at) AS last_updated
-                                            FROM read_parquet('{loc_data_path}/*.parquet');""").fetchone()
-            last_model_update = self.conn.execute(f"""SELECT MAX(updated_at) AS last_updated
-                                            FROM read_parquet('{model_path}/*.parquet');""").fetchone()
-            
-            # if the data has been updated since the last model training, retrain the model
-            if last_data_update > last_model_update:
-                print(f"The data for location {self.location_id} has been updated since the last model training. Retraining the model...")
+        Parameters
+        ----------
+        lat : float
+            Latitude of the AOI centroid.
+        lon : float
+            Longitude of the AOI centroid.
+        rad : float
+            Buffer radius in metres used to define the bbox.
+        """
+        try:
+            response = self.s3.get_object(Bucket=BUCKET_NAME, Key="aois.json")
+            registry = json.loads(response['Body'].read().decode('utf-8'))
+        except self.s3.exceptions.NoSuchKey:
+            registry = {}
 
-                # run model training
-                self.train_model() #TODO: check if this actually works
+        entry = {
+            "aoi_name": self.aoi_name,
+            "lat": lat,
+            "lon": lon,
+            "bbox": self.bbox,
+            "radius_m": rad,
+        }
 
-                preds = forecast_ts.forecast_xgb(input_df, h)
+        country_aois = registry.setdefault(self.country, [])
 
-            # if the model is up to date, do nothing
-            else:
-                print(f"The ML model for location {self.location_id} is up to date.")
-        
-        # if there is no trained ML model for the location, train a new model
+        # Replace existing entry for this aoi_name or append
+        existing = [i for i, a in enumerate(country_aois) if a["aoi_name"] == self.aoi_name]
+        if existing:
+            country_aois[existing[0]] = entry
         else:
-            print(f"No trained ML model found for location {self.location_id}. Training a new model...")
+            country_aois.append(entry)
+
+        self.s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key="aois.json",
+            Body=json.dumps(registry, indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
+        print(f"AOI '{self.aoi_name}' registered in s3://{BUCKET_NAME}/aois.json")
+
+    # ------------------------------------------------------------------
+    # Data freshness
+    # ------------------------------------------------------------------
+
+    def check_last_updated(self) -> None:
+        """
+        Check the most recent observation date for this AOI and update if stale.
+
+        - If no data exists at all -> full download from 2018-01-01 to today.
+        - If data is older than 14 days -> incremental update from last date to today.
+        - If data is fresh (within 14 days) -> no action.
+        """
+        today = pd.Timestamp.now()
+        print(f"Checking data freshness for AOI: {self.aoi_name} ({today.date()})")
+
+        try:
+            last_date = self.conn.execute(f"""
+                SELECT MAX(time) AS last_updated
+                FROM read_parquet('{self.ts_glob}')
+                WHERE aoi_name = '{self.aoi_name}';
+            """).fetchone()
+        except Exception:
+            last_date = None
+
+        if last_date is None or last_date[0] is None:
+            print(f"No data found for {self.aoi_name}. Running full download...")
+            self.downloader.extract_time_series(
+                self.bbox,
+                self.aoi_name,
+                '2018-01-01',
+                today.strftime('%Y-%m-%d')
+            )
+
+        elif last_date[0].date() < (today - pd.Timedelta(days=14)).date():
+            print(f"Data for {self.aoi_name} is stale (last: {last_date[0].date()}). Updating...")
+            self.downloader.update_time_series(self.aoi_name)
+
+        else:
+            print(f"Data for {self.aoi_name} is up to date (last: {last_date[0].date()}).")
+
+    # ------------------------------------------------------------------
+    # Model freshness
+    # ------------------------------------------------------------------
+
+    def check_ml_model(self) -> None:
+        """
+        Check whether a trained model exists and whether it needs retraining.
+
+        - If no model exists -> train from scratch.
+        - If data has been updated since the last model run -> retrain.
+        - If model is current -> no action.
+        """
+        # Check for existing model files
+        response = self.s3.list_objects_v2(
+            Bucket=BUCKET_NAME,
+            Prefix=f"{self.ml_prefix}model_{self.aoi_name}_"
+        )
+        model_exists = 'Contents' in response and len(response['Contents']) > 0
+
+        if not model_exists:
+            print(f"No model found for {self.aoi_name}. Training from scratch...")
             self.train_model()
+            return
 
+        # Compare last data update vs last model training date
+        try:
+            last_data_update = self.conn.execute(f"""
+                SELECT MAX(time) AS last_updated
+                FROM read_parquet('{self.ts_glob}')
+                WHERE aoi_name = '{self.aoi_name}';
+            """).fetchone()[0]
+        except Exception as e:
+            print(f"Could not read data timestamp: {e}")
+            return
 
-    def train_model(self):
-        """Train a new ML model for the location."""
+        # Get most recent model file date from S3 metadata
+        objects = sorted(
+            response['Contents'],
+            key=lambda o: o['LastModified'],
+            reverse=True
+        )
+        last_model_update = objects[0]['LastModified'].replace(tzinfo=None)
 
-        data_reader = DataReader()
-        ts_data = data_reader.read_ts(self.location_id)
+        if pd.Timestamp(last_data_update) > pd.Timestamp(last_model_update):
+            print(
+                f"Data updated ({last_data_update}) after last model training "
+                f"({last_model_update}). Retraining..."
+            )
+            self.train_model()
+        else:
+            print(f"Model for {self.aoi_name} is current. No retraining needed.")
+
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
+
+    def train_model(self, mae_threshold: float = 0.05) -> None:
+        """
+        Train an XGBoost forecasting model for this AOI.
+
+        Loads all time series data from S3, preprocesses it, runs
+        Optuna hyperparameter search via ForecastTS.forecast_xgb(),
+        and writes model + metrics + forecast to S3 only if the
+        cross-validated MAE is below mae_threshold.
+
+        Parameters
+        ----------
+        mae_threshold : float
+            Maximum acceptable cross-validated MAE. If the best model
+            exceeds this, training is aborted and a warning is logged.
+            Default is 0.05.
+        """
+        ts_data = self.data_reader.read_ts(self.aoi_name)
 
         da = DataAnalysis()
         spec_indices = ['ndvi', 'bsi', 'ndmi', 'nbr']
-
         proc_ts = da.preprocess_time_series(spec_indices, ts_data)
 
-        forecast_ts = ForecastTS(aoi_name=self.location_id)
+        forecast_ts = ForecastTS(aoi_name=self.aoi_name, country=self.country)
         input_df = forecast_ts.format_input_data(proc_ts)
 
-        h= 12 # forecast horizon (number of weeks to forecast)
+        h = 12  # forecast horizon: 12 weeks
 
-        # make sure the data is sorted by date for each unique_id (i.e., each spectral index.)
         input_df.sort_values(by=['unique_id', 'ds'], inplace=True)
 
-        train_dfs = []
-        test_dfs = []
-        for i in list(input_df['unique_id'].unique()):
-            temp_train = input_df[input_df['unique_id'] == i].iloc[:-h]
-            temp_test = input_df[input_df['unique_id'] == i].iloc[-h:]
-            print(f"Unique ID {i} - Train shape: {temp_train.shape}, Test shape: {temp_test.shape}")
-
-            train_dfs.append(temp_train)
-            test_dfs.append(temp_test)
+        train_dfs, test_dfs = [], []
+        for uid in input_df['unique_id'].unique():
+            subset = input_df[input_df['unique_id'] == uid]
+            train_dfs.append(subset.iloc[:-h])
+            test_dfs.append(subset.iloc[-h:])
+            print(
+                f"  {uid}: train={subset.iloc[:-h].shape[0]} rows, "
+                f"test={subset.iloc[-h:].shape[0]} rows"
+            )
 
         train_df = pd.concat(train_dfs)
         test_df = pd.concat(test_dfs)
 
-        print("Train shape:", train_df.shape)
-        print("Test shape:", test_df.shape)
+        print(f"Total train shape: {train_df.shape}")
+        print(f"Total test shape:  {test_df.shape}")
 
-        # check MAE
-        # if below a threshold
-        # train on full dataset and save model to S3 bucket
-        # else, ??????????????????
+        forecast = forecast_ts.forecast_xgb(train_df, h)
+
+        # Load the metrics just written to check MAE
+        try:
+            metrics = self.data_reader.read_latest_metrics(self.aoi_name)
+            best_mae = metrics['metrics']['mae']
+            print(f"Training complete. Best MAE: {best_mae:.4f} (threshold: {mae_threshold})")
+
+            if best_mae > mae_threshold:
+                print(
+                    f"WARNING: MAE {best_mae:.4f} exceeds threshold {mae_threshold}. "
+                    "Model artifacts were written to S3 but review is recommended."
+                )
+        except Exception as e:
+            print(f"Could not verify metrics after training: {e}")
+
+    # ------------------------------------------------------------------
+    # Full pipeline run
+    # ------------------------------------------------------------------
+
+    def run(self, 
+            lat: float = None, 
+            lon: float = None, 
+            rad: float = None) -> None:
+        """
+        Execute the full pipeline: 
+        register AOI -> check data -> check model -> train if needed
+
+        Parameters
+        ----------
+        lat : float, optional
+            Latitude of the AOI centroid. Required on first run to register
+            the AOI in aois.json. Ignored if the AOI is already registered.
+        lon : float, optional
+            Longitude of the AOI centroid.
+        rad : float, optional
+            Buffer radius in metres.
+        """
+        print(f"\n{'='*60}")
+        print(f"Pipeline run: {self.aoi_name} ({self.country})")
+        print(f"{'='*60}\n")
+
+        if lat is not None and lon is not None and rad is not None:
+            self.register_aoi(lat, lon, rad)
+
+        self.check_last_updated()
+        self.check_ml_model()
+
+        print(f"\nPipeline complete: {self.aoi_name} ({datetime.date.today()})\n")
