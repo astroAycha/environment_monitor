@@ -12,12 +12,15 @@ RUN apt-get update -q && \
 
 WORKDIR /app
 
+# Force unbuffered Python output so logs appear immediately in HF Spaces
+ENV PYTHONUNBUFFERED=1
+
 # Install Python dependencies first (layer-cached unless requirements change)
 COPY requirements-dashboard.txt requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application code.
+# Copy application code
 COPY app.py .
 COPY scripts/ scripts/
 

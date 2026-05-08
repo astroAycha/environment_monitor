@@ -1,3 +1,6 @@
+import sys
+sys.stdout = sys.__stdout__  # ensure unbuffered output in HF Spaces container
+
 """
 Environmental Monitoring Dashboard
 Dash app for Hugging Face Spaces — reads from S3 via DataReader.
