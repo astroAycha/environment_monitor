@@ -10,8 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# TODO: move this to a config file or environment variable
-BUCKET_NAME = os.getenv("BUCKET_NAME", "env_monitor")
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
 
 class DataReader:
@@ -19,11 +18,11 @@ class DataReader:
     Read time series, forecasts, metrics, and AOI metadata from S3.
 
     Expected S3 structure:
-        s3://env_monitor/aois.json
-        s3://env_monitor/{country}/{aoi_name}/ts/*.parquet
-        s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
-        s3://env_monitor/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
-        s3://env_monitor/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
+        s3://{BUCKET_NAME}/aois.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ts/*.parquet
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
     """
 
     def __init__(self, country: str):
@@ -31,11 +30,13 @@ class DataReader:
         self.conn = duckdb.connect()
         self.conn.execute("INSTALL spatial;")
         self.conn.execute("LOAD spatial;")
-        self.conn.execute("""CREATE SECRET (
-                        TYPE s3,
-                        PROVIDER credential_chain
-                        );
-                     """)
+
+        self.conn.execute(f"""CREATE SECRET (
+            TYPE s3,
+            KEY_ID '{os.getenv("AWS_ACCESS_KEY_ID")}',
+            SECRET '{os.getenv("AWS_SECRET_ACCESS_KEY")}',
+            REGION '{os.getenv("AWS_DEFAULT_REGION", "us-east-1")}'
+        );""")
         self.s3 = boto3.client("s3")
 
     def _ts_glob(self, aoi_name: str) -> str:
@@ -53,7 +54,7 @@ class DataReader:
         Read the top-level AOI registry from S3.
 
         Reads from:
-            s3://env_monitor/aois.json
+            s3://{BUCKET_NAME}/aois.json
 
         Returns
         -------
@@ -85,7 +86,7 @@ class DataReader:
         Read all time series parquet files for an AOI.
 
         Reads from:
-            s3://env_monitor/{country}/{aoi_name}/ts/*.parquet
+            s3://{BUCKET_NAME}/{country}/{aoi_name}/ts/*.parquet
 
         Parameters
         ----------
@@ -153,7 +154,7 @@ class DataReader:
         Read forecast parquet(s) for an AOI from the ml/ subdirectory.
 
         Reads from:
-            s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_*.parquet
+            s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/forecast_{aoi_name}_*.parquet
 
         Parameters
         ----------
@@ -205,7 +206,7 @@ class DataReader:
         Read the most recently written metrics JSON for an AOI.
 
         Reads from:
-            s3://env_monitor/{country}/{aoi_name}/ml/metrics_{aoi_name}_*.json
+            s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/metrics_{aoi_name}_*.json
 
         Parameters
         ----------
