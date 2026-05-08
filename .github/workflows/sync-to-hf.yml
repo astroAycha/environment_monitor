@@ -21,4 +21,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push -f https://astroAycha:$HF_TOKEN@huggingface.co/spaces/astroAycha/environment_monitor main
+          git push -f https://astroAycha:$HF_TOKEN@huggingface.co/spaces/astroAycha/environment_monitor HEAD:main
