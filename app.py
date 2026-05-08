@@ -55,14 +55,20 @@ server = app.server
 
 def load_aois() -> dict:
     """Fetch aois.json from S3. Returns {} on failure."""
+    import traceback
+    bucket = os.getenv("S3_BUCKET_NAME", "environment-monitor")
+    key_id = os.getenv("AWS_ACCESS_KEY_ID", "NOT SET")
+    region = os.getenv("AWS_DEFAULT_REGION", "NOT SET")
+    print(f"DEBUG load_aois: bucket={bucket} region={region} key_id={key_id[:6]}...")
     try:
-        import os
         s3 = boto3.client("s3")
-        bucket = os.getenv("BUCKET_NAME", "env_monitor")
         resp = s3.get_object(Bucket=bucket, Key="aois.json")
-        return json.loads(resp["Body"].read().decode("utf-8"))
+        data = json.loads(resp["Body"].read().decode("utf-8"))
+        print(f"DEBUG load_aois: loaded {list(data.keys())} countries")
+        return data
     except Exception as e:
-        print(f"Could not load aois.json: {e}")
+        print(f"ERROR load_aois: {e}")
+        traceback.print_exc()
         return {}
 
 
@@ -371,6 +377,8 @@ def load_data(aoi_value: str):
     country  = sel["country"]
     aoi_name = sel["aoi_name"]
 
+    print(f"DEBUG load_data: country={country} aoi={aoi_name}")
+    print(f"DEBUG load_data: S3_BUCKET_NAME={os.getenv('S3_BUCKET_NAME')} AWS_KEY={os.getenv('AWS_ACCESS_KEY_ID','NOT SET')[:6]}...")
     reader = DataReader(country=country)
 
     # time series
