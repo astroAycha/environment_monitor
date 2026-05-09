@@ -212,10 +212,10 @@ def make_chart(ts_df, fc_df, key):
 
 def stat_card(label, value, sub="", color="rgba(29, 158, 117, 1)"):
     return dbc.Col(html.Div([
-            html.Div(label, style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase","letterSpacing":"0.06em","marginBottom":"4px"}),
+        html.Div(label, style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase","letterSpacing":"0.06em","marginBottom":"4px"}),
         html.Div(value, style={"fontSize":"22px","fontWeight":"500","color":"rgba(26, 26, 24, 1)","lineHeight":"1.1"}),
         html.Div(sub,   style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","marginTop":"2px"}),
-    ], style={"background":"rgba(247, 246, 242, 1)","borderRadius":"8px","padding":"10px 14px","borderLeft":f"3px solid {color}"})
+    ], style={"background":"rgba(247, 246, 242, 1)","borderRadius":"8px","padding":"10px 14px","borderLeft":f"3px solid {color}"}), width=3)
 
 def dot_row(color, text):
     return html.Div([
