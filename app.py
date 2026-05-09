@@ -30,10 +30,10 @@ KEY_ID     = os.getenv("AWS_ACCESS_KEY_ID", "")
 KEY_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 
 INDICES = {
-    "ndvi": {"label": "NDVI", "color": "#1D9E75", "description": "Normalized Difference Vegetation Index"},
-    "bsi":  {"label": "BSI",  "color": "#BA7517", "description": "Bare Soil Index"},
-    "ndmi": {"label": "NDMI", "color": "#378ADD", "description": "Normalized Difference Moisture Index"},
-    "nbr":  {"label": "NBR",  "color": "#D85A30", "description": "Normalized Burn Ratio"},
+    "ndvi": {"label": "NDVI", "color": "rgba(29, 158, 117, 1)", "description": "Normalized Difference Vegetation Index"},
+    "bsi":  {"label": "BSI",  "color": "rgba(186, 117, 23, 1)", "description": "Bare Soil Index"},
+    "ndmi": {"label": "NDMI", "color": "rgba(55, 138, 221, 1)", "description": "Normalized Difference Moisture Index"},
+    "nbr":  {"label": "NBR",  "color": "rgba(216, 90, 48, 1)", "description": "Normalized Burn Ratio"},
 }
 
 TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -179,10 +179,13 @@ def make_chart(ts_df, fc_df, key):
         if not fc.empty:
             y_fc = fc["XGBRegressor"]
             ci   = y_fc.std() * 1.96 if len(y_fc) > 1 else y_fc.mean() * 0.05
+            # Convert rgba color to have 0.133 opacity for the confidence interval band
+            color_rgb = color.replace('rgba(', '').replace(')', '').split(', ')
+            fillcolor = f"rgba({color_rgb[0]}, {color_rgb[1]}, {color_rgb[2]}, 0.133)"
             fig.add_trace(go.Scatter(
                 x=pd.concat([fc["ds"], fc["ds"].iloc[::-1]]),
                 y=pd.concat([y_fc + ci, (y_fc - ci).iloc[::-1]]),
-                fill="toself", fillcolor=color + "22",
+                fill="toself", fillcolor=fillcolor,
                 line=dict(color="rgba(0,0,0,0)"),
                 name="95% CI", hoverinfo="skip", showlegend=True,
             ))
@@ -194,40 +197,40 @@ def make_chart(ts_df, fc_df, key):
 
     fig.update_layout(
         margin=dict(l=8, r=8, t=32, b=8),
-        title=dict(text=f"<b>{cfg['label']}</b>  <span style='font-size:12px;color:#888'>{cfg['description']}</span>",
+        title=dict(text=f"<b>{cfg['label']}</b>  <span style='font-size:12px;color:rgba(136, 136, 136, 1)'>{cfg['description']}</span>",
                    font=dict(size=14), x=0, xref="paper"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1, font=dict(size=11)),
         hovermode="x unified",
-        xaxis=dict(showgrid=True, gridcolor="#e8e8e4", zeroline=False, tickfont=dict(size=11)),
-        yaxis=dict(showgrid=True, gridcolor="#e8e8e4", zeroline=False, tickfont=dict(size=11), tickformat=".3f"),
+        xaxis=dict(showgrid=True, gridcolor="rgba(232, 232, 228, 1)", zeroline=False, tickfont=dict(size=11)),
+        yaxis=dict(showgrid=True, gridcolor="rgba(232, 232, 228, 1)", zeroline=False, tickfont=dict(size=11), tickformat=".3f"),
         height=240,
     )
     return fig
 
 # ── UI pieces ──────────────────────────────────────────────────────────────────
 
-def stat_card(label, value, sub="", color="#1D9E75"):
+def stat_card(label, value, sub="", color="rgba(29, 158, 117, 1)"):
     return dbc.Col(html.Div([
-        html.Div(label, style={"fontSize":"11px","color":"#888","textTransform":"uppercase","letterSpacing":"0.06em","marginBottom":"4px"}),
-        html.Div(value, style={"fontSize":"22px","fontWeight":"500","color":"#1a1a18","lineHeight":"1.1"}),
-        html.Div(sub,   style={"fontSize":"11px","color":"#888","marginTop":"2px"}),
-    ], style={"background":"#f7f6f2","borderRadius":"8px","padding":"10px 14px","borderLeft":f"3px solid {color}"}), width=3)
+            html.Div(label, style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase","letterSpacing":"0.06em","marginBottom":"4px"}),
+        html.Div(value, style={"fontSize":"22px","fontWeight":"500","color":"rgba(26, 26, 24, 1)","lineHeight":"1.1"}),
+        html.Div(sub,   style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","marginTop":"2px"}),
+    ], style={"background":"rgba(247, 246, 242, 1)","borderRadius":"8px","padding":"10px 14px","borderLeft":f"3px solid {color}"})
 
 def dot_row(color, text):
     return html.Div([
         html.Span(style={"display":"inline-block","width":"7px","height":"7px","borderRadius":"50%",
                          "background":color,"marginRight":"8px","flexShrink":"0"}),
         html.Span(text),
-    ], style={"display":"flex","alignItems":"center","marginBottom":"6px","color":"#444"})
+    ], style={"display":"flex","alignItems":"center","marginBottom":"6px","color":"rgba(68, 68, 68, 1)"})
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 
-SIDEBAR = {"width":"260px","minWidth":"260px","background":"#fff","borderRight":"1px solid #e8e7e2",
+SIDEBAR = {"width":"260px","minWidth":"260px","background":"rgba(255, 255, 255, 1)","borderRight":"1px solid rgba(232, 231, 226, 1)",
            "padding":"20px 16px","display":"flex","flexDirection":"column","gap":"20px",
            "overflowY":"auto","fontSize":"13px"}
-MAIN    = {"flex":"1","display":"flex","flexDirection":"column","overflow":"hidden","background":"#f4f3ef"}
-SEC     = {"fontSize":"10px","fontWeight":"600","color":"#888","textTransform":"uppercase",
+MAIN    = {"flex":"1","display":"flex","flexDirection":"column","overflow":"hidden","background":"rgba(244, 243, 239, 1)"}
+SEC     = {"fontSize":"10px","fontWeight":"600","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase",
            "letterSpacing":"0.08em","marginBottom":"8px"}
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],
@@ -236,10 +239,10 @@ server = app.server
 
 app.layout = html.Div([
     html.Div([
-        html.Span("Environmental Monitor", style={"fontSize":"15px","fontWeight":"500","color":"#1a1a18"}),
-        html.Span(f"Last refreshed: {date.today().isoformat()}", style={"fontSize":"12px","color":"#888","marginLeft":"auto"}),
+        html.Span("Environmental Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
+        html.Span(f"Last refreshed: {date.today().isoformat()}", style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginLeft":"auto"}),
     ], style={"display":"flex","alignItems":"center","padding":"10px 20px",
-              "background":"#fff","borderBottom":"1px solid #e8e7e2","height":"44px"}),
+              "background":"rgba(255, 255, 255, 1)","borderBottom":"1px solid rgba(232, 231, 226, 1)","height":"44px"}),
 
     html.Div([
         html.Div([
@@ -272,8 +275,7 @@ app.layout = html.Div([
         ], style=MAIN),
     ], style={"display":"flex","flex":"1","overflow":"hidden"}),
 ], style={"display":"flex","flexDirection":"column","height":"100vh",
-          "fontFamily":"'IBM Plex Sans',sans-serif","background":"#f4f3ef"})
-
+              "fontFamily":"'IBM Plex Sans',sans-serif","background":"rgba(244, 243, 239, 1)"})
 # ── Callbacks ──────────────────────────────────────────────────────────────────
 
 @callback(Output("aoi-dropdown","options"), Output("aoi-dropdown","value"),
@@ -303,10 +305,11 @@ def update_map(aoi_value):
     bbox     = meta["bbox"]
     lat, lon = bbox_center(bbox)
     polygon  = {"type":"Feature","geometry":{"type":"Polygon","coordinates":[[
+
         [bbox[0],bbox[1]],[bbox[2],bbox[1]],[bbox[2],bbox[3]],[bbox[0],bbox[3]],[bbox[0],bbox[1]]
     ]]},"properties":{"name":aoi_name}}
     return ([lat,lon], 14,
-            [dl.GeoJSON(data=polygon, style={"color":"#185FA5","weight":2,"fillOpacity":0.08,"dashArray":"6 4"}),
+            [dl.GeoJSON(data=polygon, style={"color":"rgba(24, 95, 165, 1)","weight":2,"fillOpacity":0.08,"dashArray":"6 4"}),
              dl.Marker(position=[lat,lon], children=dl.Tooltip(aoi_name))])
 
 
@@ -314,23 +317,23 @@ def update_map(aoi_value):
 def update_status(aoi_value):
     parsed = parse_sel(aoi_value)
     if not parsed:
-        return html.Div("Select an AOI.", style={"color":"#888","fontSize":"12px"})
+        return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
     country, aoi_name = parsed
     rows    = []
     ts_df   = read_ts(country, aoi_name)
     if not ts_df.empty:
         last      = ts_df["time"].max().date()
         staleness = (date.today() - last).days
-        rows.append(dot_row("#639922" if staleness <= 14 else "#BA7517", f"Data: {last.isoformat()}"))
+        rows.append(dot_row("rgba(99, 153, 34, 1)" if staleness <= 14 else "rgba(186, 117, 23, 1)", f"Data: {last.isoformat()}"))
     else:
-        rows.append(dot_row("#c00", "Data: could not load"))
+        rows.append(dot_row("rgba(204, 0, 0, 1)", "Data: could not load"))
     metrics = read_metrics(country, aoi_name)
     if metrics:
-        rows.append(dot_row("#639922", f"Model: {metrics.get('run_date','—')}"))
-        rows.append(dot_row("#639922", "Forecast: ready"))
+        rows.append(dot_row("rgba(99, 153, 34, 1)", f"Model: {metrics.get('run_date','—')}"))
+        rows.append(dot_row("rgba(99, 153, 34, 1)", "Forecast: ready"))
     else:
-        rows.append(dot_row("#888", "Model: not found"))
-    rows.append(dot_row("#888780", "Schedule: every 2 weeks"))
+        rows.append(dot_row("rgba(136, 136, 136, 1)", "Model: not found"))
+    rows.append(dot_row("rgba(136, 135, 128, 1)", "Schedule: every 2 weeks"))
     return html.Div(rows)
 
 
@@ -338,33 +341,33 @@ def update_status(aoi_value):
 def update_metrics(aoi_value):
     parsed = parse_sel(aoi_value)
     if not parsed:
-        return html.Div("Select an AOI.", style={"color":"#888","fontSize":"12px"})
+        return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
     country, aoi_name = parsed
     metrics = read_metrics(country, aoi_name)
     if not metrics:
-        return html.Div("No metrics available.", style={"color":"#888","fontSize":"12px"})
+        return html.Div("No metrics available.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
     m = metrics.get("metrics", {})
     def mrow(lbl, val):
-        return html.Div([html.Span(lbl, style={"color":"#888","flex":"1"}),
+        return html.Div([html.Span(lbl, style={"color":"rgba(136, 136, 136, 1)","flex":"1"}),
                          html.Span(f"{val:.4f}" if isinstance(val, float) else str(val),
-                                   style={"fontWeight":"500","color":"#1a1a18"})],
+                                   style={"fontWeight":"500","color":"rgba(26, 26, 24, 1)"})],
                         style={"display":"flex","justifyContent":"space-between",
-                               "padding":"5px 0","borderBottom":"1px solid #f0efe9"})
+                               "padding":"5px 0","borderBottom":"1px solid rgba(240, 239, 233, 1)"})
     return html.Div([mrow("MAE", m.get("mae","—")), mrow("RMSE", m.get("rmse","—")),
                      mrow("MAPE", m.get("mape","—")),
                      html.Div(f"CV windows: {metrics.get('cv_windows','—')}",
-                              style={"fontSize":"11px","color":"#aaa","marginTop":"6px"})])
+                              style={"fontSize":"11px","color":"rgba(170, 170, 170, 1)","marginTop":"6px"})])
 
 
 @callback(Output("stats-panel","children"), Input("aoi-dropdown","value"))
 def update_stats(aoi_value):
     parsed = parse_sel(aoi_value)
     if not parsed:
-        return html.Div("Select an AOI.", style={"color":"#888","fontSize":"12px"})
+        return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
     country, aoi_name = parsed
     ts_df = read_ts(country, aoi_name)
     if ts_df.empty:
-        return html.Div("No data.", style={"color":"#888","fontSize":"12px"})
+        return html.Div("No data.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
     rows = []
     for key, cfg in INDICES.items():
         if key not in ts_df.columns:
@@ -374,11 +377,11 @@ def update_stats(aoi_value):
             html.Div([html.Span("●", style={"color":cfg["color"],"marginRight":"5px"}),
                       html.Span(cfg["label"], style={"fontWeight":"500"})],
                      style={"marginBottom":"2px"}),
-            html.Div([html.Span(f"min {col.min():.3f}",  style={"marginRight":"8px","color":"#666"}),
-                      html.Span(f"mean {col.mean():.3f}", style={"marginRight":"8px","color":"#666"}),
-                      html.Span(f"max {col.max():.3f}",  style={"color":"#666"})],
+            html.Div([html.Span(f"min {col.min():.3f}",  style={"marginRight":"8px","color":"rgba(102, 102, 102, 1)"}),
+                      html.Span(f"mean {col.mean():.3f}", style={"marginRight":"8px","color":"rgba(102, 102, 102, 1)"}),
+                      html.Span(f"max {col.max():.3f}",  style={"color":"rgba(102, 102, 102, 1)"})],
                      style={"fontSize":"11px"}),
-        ], style={"padding":"7px 0","borderBottom":"1px solid #f0efe9"}))
+        ], style={"padding":"7px 0","borderBottom":"1px solid rgba(240, 239, 233, 1)"}))
     return html.Div(rows)
 
 
@@ -395,21 +398,21 @@ def update_summary(aoi_value):
     if not ts_df.empty:
         cards.append(stat_card("Observations", str(len(ts_df)),
                                f"{ts_df['time'].min().strftime('%Y-%m-%d')} → {ts_df['time'].max().strftime('%Y-%m-%d')}",
-                               "#1D9E75"))
+                               "rgba(29, 158, 117, 1)"))
     else:
-        cards.append(stat_card("Observations", "—", "", "#888"))
+        cards.append(stat_card("Observations", "—", "", "rgba(136, 136, 136, 1)"))
     if not fc_df.empty:
         horizon = fc_df.groupby("unique_id")["ds"].count().max()
         cards.append(stat_card("Forecast horizon", f"{horizon}w",
-                               f"to {fc_df['ds'].max().strftime('%Y-%m-%d')}", "#378ADD"))
+                               f"to {fc_df['ds'].max().strftime('%Y-%m-%d')}", "rgba(55, 138, 221, 1)"))
     else:
-        cards.append(stat_card("Forecast horizon", "—", "", "#888"))
+        cards.append(stat_card("Forecast horizon", "—", "", "rgba(136, 136, 136, 1)"))
     if metrics:
-        cards.append(stat_card("Best MAE",  f"{metrics['metrics'].get('mae',0):.4f}", "cross-validated", "#D85A30"))
-        cards.append(stat_card("Model run", metrics.get("run_date","—"), metrics.get("experiment_name","")[:28], "#BA7517"))
+        cards.append(stat_card("Best MAE",  f"{metrics['metrics'].get('mae',0):.4f}", "cross-validated", "rgba(216, 90, 48, 1)"))
+        cards.append(stat_card("Model run", metrics.get("run_date","—"), metrics.get("experiment_name","")[:28], "rgba(186, 117, 23, 1)"))
     else:
-        cards.append(stat_card("Best MAE", "—", "", "#888"))
-        cards.append(stat_card("Model run", "—", "", "#888"))
+        cards.append(stat_card("Best MAE", "—", "", "rgba(136, 136, 136, 1)"))
+        cards.append(stat_card("Model run", "—", "", "rgba(136, 136, 136, 1)"))
     return dbc.Row(cards, className="g-2")
 
 
