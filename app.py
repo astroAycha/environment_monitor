@@ -44,7 +44,7 @@ TILE_ATTRIBUTION = "Esri, Maxar, Earthstar Geographics"
 
 def make_conn():
     conn = duckdb.connect()
-    conn.execute("INSTALL spatial; LOAD spatial;")
+    # No spatial extension — dashboard only reads scalar columns from parquet
     conn.execute(f"""
         CREATE SECRET IF NOT EXISTS s3_secret (
             TYPE s3,
@@ -83,7 +83,9 @@ def read_ts(country, aoi_name):
     try:
         df = CONN.execute(f"""
             SELECT time, ndvi, bsi, ndmi, nbr
-            FROM   read_parquet('{glob}')
+            FROM   read_parquet('{glob}',
+                                union_by_name=true,
+                                hive_partitioning=false)
             WHERE  aoi_name = '{aoi_name}'
             AND    time > '2018-01-01'
             ORDER  BY time
@@ -94,7 +96,28 @@ def read_ts(country, aoi_name):
     except Exception as e:
         print(f"read_ts error: {e}")
         traceback.print_exc()
-        return pd.DataFrame()
+        # Fallback: use boto3 + pyarrow to read parquet directly
+        try:
+            import boto3, io, pyarrow.parquet as pq
+            s3  = boto3.client("s3")
+            prefix = f"{country}/{aoi_name}/ts/"
+            resp   = s3.list_objects_v2(Bucket=BUCKET, Prefix=prefix)
+            dfs    = []
+            for obj in resp.get("Contents", []):
+                if obj["Key"].endswith(".parquet"):
+                    buf  = io.BytesIO(s3.get_object(Bucket=BUCKET, Key=obj["Key"])["Body"].read())
+                    tbl  = pq.read_table(buf, columns=["time","ndvi","bsi","ndmi","nbr","aoi_name"])
+                    dfs.append(tbl.to_pandas())
+            if not dfs:
+                return pd.DataFrame()
+            df = pd.concat(dfs)
+            df = df[df["aoi_name"] == aoi_name].query("time > '2018-01-01'").sort_values("time")
+            df["time"] = pd.to_datetime(df["time"])
+            print(f"read_ts fallback OK: {df.shape}")
+            return df[["time","ndvi","bsi","ndmi","nbr"]]
+        except Exception as e2:
+            print(f"read_ts fallback error: {e2}")
+            return pd.DataFrame()
 
 def read_forecasts(country, aoi_name):
     glob = f"s3://{BUCKET}/{country}/{aoi_name}/ml/forecast_{aoi_name}_*.parquet"
