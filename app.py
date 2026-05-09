@@ -388,9 +388,9 @@ def load_data(aoi_value: str):
     # time series
     try:
         ts_df = reader.read_ts(aoi_name)
-        ts_json = ts_df.drop(columns=["geometry", "geometry_wkt"], errors="ignore").to_json(
-            date_format="iso", orient="split"
-        )
+        ts_df = ts_df.drop(columns=["geometry", "geometry_wkt", "bbox_area"], errors="ignore")
+        ts_df["time"] = pd.to_datetime(ts_df["time"]).dt.strftime("%Y-%m-%d")
+        ts_json = ts_df.to_json(orient="split")
     except Exception as e:
         print(f"TS load error: {e}")
         ts_json = None
@@ -398,7 +398,8 @@ def load_data(aoi_value: str):
     # forecast
     try:
         fc_df = reader.read_forecasts(aoi_name, forecast_date="latest")
-        fc_json = fc_df.to_json(date_format="iso", orient="split")
+        fc_df["ds"] = pd.to_datetime(fc_df["ds"]).dt.strftime("%Y-%m-%d")
+        fc_json = fc_df.to_json(orient="split")
     except Exception as e:
         print(f"Forecast load error: {e}")
         fc_json = None
@@ -607,7 +608,7 @@ def update_summary_stats(ts_json, fc_json, metrics):
         try:
             fc_df = pd.read_json(fc_json, orient="split")
             horizon = fc_df.groupby("unique_id")["ds"].count().max()
-            fc_end = pd.to_datetime(fc_df["ds"]).max().strftime("%Y-%m-%d")
+            fc_end = fc_df["ds"].max()
             cards.append(summary_stat_card("Forecast horizon", f"{horizon}w", f"to {fc_end}", "#378ADD"))
         except Exception:
             cards.append(summary_stat_card("Forecast horizon", "—", "", "#888"))
