@@ -636,14 +636,17 @@ def _make_chart_callback(index_key: str, chart_id: str):
             try:
                 ts_df = pd.read_json(ts_json, orient="split")
                 ts_df["time"] = pd.to_datetime(ts_df["time"])
-            except Exception:
-                pass
+                print(f"DEBUG chart {_key}: ts cols={list(ts_df.columns)} shape={ts_df.shape}")
+                print(f"DEBUG chart {_key}: ts time sample={ts_df['time'].iloc[0]} {_key} sample={ts_df[_key].iloc[0] if _key in ts_df.columns else 'MISSING'}")
+            except Exception as e:
+                print(f"DEBUG chart {_key}: ts parse error: {e}")
         if fc_json:
             try:
                 fc_df = pd.read_json(fc_json, orient="split")
                 fc_df["ds"] = pd.to_datetime(fc_df["ds"])
-            except Exception:
-                pass
+                print(f"DEBUG chart {_key}: fc cols={list(fc_df.columns)} unique_ids={fc_df['unique_id'].unique().tolist()}")
+            except Exception as e:
+                print(f"DEBUG chart {_key}: fc parse error: {e}")
         return make_index_chart(ts_df, fc_df, _key)
 
     return _cb
