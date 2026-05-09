@@ -15,7 +15,6 @@ import boto3
 import dash
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-import duckdb
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, callback, dcc, html
@@ -40,28 +39,6 @@ INDICES = {
 TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 TILE_ATTRIBUTION = "Esri, Maxar, Earthstar Geographics"
 
-# ── DuckDB connection ──────────────────────────────────────────────────────────
-
-def make_conn():
-    conn = duckdb.connect()
-    # No spatial extension — dashboard only reads scalar columns from parquet
-    conn.execute(f"""
-        CREATE SECRET IF NOT EXISTS s3_secret (
-            TYPE s3,
-            KEY_ID '{KEY_ID}',
-            SECRET '{KEY_SECRET}',
-            REGION '{REGION}'
-        );
-    """)
-    return conn
-
-try:
-    CONN = make_conn()
-    print(f"DuckDB ready. bucket={BUCKET} region={REGION} key={KEY_ID[:6]}...")
-except Exception as e:
-    print(f"DuckDB init error: {e}")
-    CONN = None
-
 # ── Data helpers ───────────────────────────────────────────────────────────────
 
 def s3():
@@ -79,63 +56,80 @@ def load_aois():
         return {}
 
 def read_ts(country, aoi_name):
-    glob = f"s3://{BUCKET}/{country}/{aoi_name}/ts/*.parquet"
+    """Read time series parquet files from S3 using pyarrow.
+    Uses pyarrow directly because the parquet files contain a geopandas
+    geometry column that DuckDB cannot parse without the spatial extension.
+    """
+    import io
+    import pyarrow.parquet as pq
+    prefix = f"{country}/{aoi_name}/ts/"
     try:
-        df = CONN.execute(f"""
-            SELECT time, ndvi, bsi, ndmi, nbr
-            FROM   read_parquet('{glob}',
-                                union_by_name=true,
-                                hive_partitioning=false)
-            WHERE  aoi_name = '{aoi_name}'
-            AND    time > '2018-01-01'
-            ORDER  BY time
-        """).df()
+        s3_client = boto3.client("s3")
+        resp = s3_client.list_objects_v2(Bucket=BUCKET, Prefix=prefix)
+        if "Contents" not in resp:
+            print(f"read_ts: no files found at {prefix}")
+            return pd.DataFrame()
+        dfs = []
+        for obj in resp["Contents"]:
+            if not obj["Key"].endswith(".parquet"):
+                continue
+            buf = io.BytesIO(
+                s3_client.get_object(Bucket=BUCKET, Key=obj["Key"])["Body"].read()
+            )
+            tbl = pq.read_table(buf, columns=["time", "ndvi", "bsi", "ndmi", "nbr", "aoi_name"])
+            dfs.append(tbl.to_pandas())
+        if not dfs:
+            return pd.DataFrame()
+        df = pd.concat(dfs, ignore_index=True)
+        df = (df[df["aoi_name"] == aoi_name]
+                .query("time > '2018-01-01'")
+                .sort_values("time")
+                .reset_index(drop=True))
         df["time"] = pd.to_datetime(df["time"])
         print(f"read_ts OK: {df.shape}")
-        return df
+        return df[["time", "ndvi", "bsi", "ndmi", "nbr"]]
     except Exception as e:
         print(f"read_ts error: {e}")
         traceback.print_exc()
-        # Fallback: use boto3 + pyarrow to read parquet directly
-        try:
-            import boto3, io, pyarrow.parquet as pq
-            s3  = boto3.client("s3")
-            prefix = f"{country}/{aoi_name}/ts/"
-            resp   = s3.list_objects_v2(Bucket=BUCKET, Prefix=prefix)
-            dfs    = []
-            for obj in resp.get("Contents", []):
-                if obj["Key"].endswith(".parquet"):
-                    buf  = io.BytesIO(s3.get_object(Bucket=BUCKET, Key=obj["Key"])["Body"].read())
-                    tbl  = pq.read_table(buf, columns=["time","ndvi","bsi","ndmi","nbr","aoi_name"])
-                    dfs.append(tbl.to_pandas())
-            if not dfs:
-                return pd.DataFrame()
-            df = pd.concat(dfs)
-            df = df[df["aoi_name"] == aoi_name].query("time > '2018-01-01'").sort_values("time")
-            df["time"] = pd.to_datetime(df["time"])
-            print(f"read_ts fallback OK: {df.shape}")
-            return df[["time","ndvi","bsi","ndmi","nbr"]]
-        except Exception as e2:
-            print(f"read_ts fallback error: {e2}")
-            return pd.DataFrame()
+        return pd.DataFrame()
 
 def read_forecasts(country, aoi_name):
-    glob = f"s3://{BUCKET}/{country}/{aoi_name}/ml/forecast_{aoi_name}_*.parquet"
+    """Read latest forecast parquet from S3 using pyarrow."""
+    import io
+    import pyarrow.parquet as pq
+    prefix = f"{country}/{aoi_name}/ml/"
     try:
-        df = CONN.execute(f"""
-            SELECT unique_id, ds, XGBRegressor
-            FROM   read_parquet('{glob}')
-            WHERE  aoi_name = '{aoi_name}'
-            AND    forecast_date = (
-                SELECT MAX(forecast_date)
-                FROM   read_parquet('{glob}')
-                WHERE  aoi_name = '{aoi_name}'
+        s3_client = boto3.client("s3")
+        resp = s3_client.list_objects_v2(Bucket=BUCKET, Prefix=prefix)
+        if "Contents" not in resp:
+            print(f"read_forecasts: no files found at {prefix}")
+            return pd.DataFrame()
+        # find all forecast parquet files
+        fc_keys = [o["Key"] for o in resp["Contents"]
+                   if o["Key"].endswith(".parquet")
+                   and f"forecast_{aoi_name}_" in o["Key"]]
+        if not fc_keys:
+            return pd.DataFrame()
+        dfs = []
+        for key in fc_keys:
+            buf = io.BytesIO(
+                s3_client.get_object(Bucket=BUCKET, Key=key)["Body"].read()
             )
-            ORDER BY unique_id, ds
-        """).df()
+            tbl = pq.read_table(buf, columns=["unique_id", "ds", "XGBRegressor",
+                                               "forecast_date", "aoi_name"])
+            dfs.append(tbl.to_pandas())
+        if not dfs:
+            return pd.DataFrame()
+        df = pd.concat(dfs, ignore_index=True)
+        df = df[df["aoi_name"] == aoi_name]
+        # keep only the latest forecast date
+        latest = df["forecast_date"].max()
+        df = (df[df["forecast_date"] == latest]
+                .sort_values(["unique_id", "ds"])
+                .reset_index(drop=True))
         df["ds"] = pd.to_datetime(df["ds"])
-        print(f"read_forecasts OK: {df.shape}")
-        return df
+        print(f"read_forecasts OK: {df.shape} (forecast_date={latest})")
+        return df[["unique_id", "ds", "XGBRegressor"]]
     except Exception as e:
         print(f"read_forecasts error: {e}")
         traceback.print_exc()
