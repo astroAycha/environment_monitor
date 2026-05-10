@@ -9,7 +9,6 @@ import mlflow
 import mlflow.xgboost
 import optuna
 import pandas as pd
-
 from mlforecast import MLForecast
 from mlforecast.lag_transforms import RollingMean, RollingStd
 from sklearn.metrics import (mean_absolute_error,
@@ -180,7 +179,8 @@ class ForecastTS:
 
     def forecast_xgb(self,
                      input_data: pd.DataFrame,
-                     forecast_horizon: int) -> pd.DataFrame:
+                     forecast_horizon: int,
+                     full_data: pd.DataFrame = None) -> pd.DataFrame:
         """
         Train an XGBoost forecaster with Optuna hyperparameter search,
         persist model + metrics + forecast to S3, and return the forecast.
@@ -194,17 +194,20 @@ class ForecastTS:
         ----------
         input_data: pd.DataFrame
             Formatted DataFrame with columns 'ds', 'y', 'unique_id'.
+            Used for Optuna cross-validation — typically the train split.
         forecast_horizon: int
             Number of future weekly steps to forecast.
+        full_data: pd.DataFrame, optional
+            Full dataset including all observations. When provided, the final
+            model is fit on this before predicting so that forecast dates
+            extend beyond the end of the training period into the future.
+            If None, input_data is used for both CV and the final fit.
 
         Returns
         -------
         pd.DataFrame
-            Forecast DataFrame.
+            Forecast DataFrame with future dates.
         """
-        import boto3
-        import traceback
-
         run_date = date.today().strftime('%Y-%m-%d')
 
         def objective(trial):
@@ -215,22 +218,23 @@ class ForecastTS:
                 'subsample': trial.suggest_float('subsample', 0.5, 1.0),
                 'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
             }
+
             mlf = self._get_mlforecast(XGBRegressor(**params, verbosity=0))
             cv = mlf.cross_validation(input_data, n_windows=3, h=forecast_horizon)
+
             mae = mean_absolute_error(cv['y'], cv['XGBRegressor'])
-            # log to mlflow if available — never fatal
-            try:
-                with mlflow.start_run(nested=True):
-                    mlflow.log_params(params)
-                    mlflow.log_metric("mae", mae)
-                    mlflow.log_metric("rmse", root_mean_squared_error(cv['y'], cv['XGBRegressor']))
-                    mlflow.log_metric("mape", mean_absolute_percentage_error(cv['y'], cv['XGBRegressor']))
-            except Exception:
-                pass
+            rmse = root_mean_squared_error(cv['y'], cv['XGBRegressor'])
+            mape = mean_absolute_percentage_error(cv['y'], cv['XGBRegressor'])
+
+            with mlflow.start_run(nested=True):
+                mlflow.log_params(params)
+                mlflow.log_metric("mae", mae)
+                mlflow.log_metric("rmse", rmse)
+                mlflow.log_metric("mape", mape)
+
             return mae
 
-        # ── 1. Optuna study ───────────────────────────────────────────────────
-        print("Starting Optuna hyperparameter search...")
+        # ── 1. Optuna study ───────────────────────────────────────────────────────
         study = optuna.create_study(direction='minimize')
         try:
             with mlflow.start_run(run_name=f"{self.aoi_name}_{run_date}"):
@@ -238,33 +242,31 @@ class ForecastTS:
                 mlflow.log_params({f"best_{k}": v for k, v in study.best_params.items()})
                 mlflow.log_metric("best_mae", study.best_value)
         except Exception as e:
-            print(f"MLflow parent run warning (non-fatal): {e}")
-            # run without mlflow if it failed before optimizing
-            if study.best_params is None:
+            print(f"MLflow logging warning (non-fatal): {e}")
+            if not study.trials:
                 study.optimize(objective, n_trials=100, show_progress_bar=True)
 
         print(f"Best MAE:    {study.best_value}")
         print(f"Best params: {study.best_params}")
-
-        # ── 2. Refit on full dataset ──────────────────────────────────────────
-        print("Refitting best model on full dataset...")
         best = study.best_params
-        mlf_best = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
-        mlf_best.fit(input_data)
-        print("Refit complete.")
 
-        # ── 3. CV with best params for metrics ───────────────────────────────
+        # ── 2. CV on train split for metrics ──────────────────────────────────
         print("Running CV for metrics...")
-        cv_best = mlf_best.cross_validation(input_data, n_windows=3, h=forecast_horizon)
+        mlf_cv = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
+        cv_best = mlf_cv.cross_validation(input_data, n_windows=3, h=forecast_horizon)
         print("CV complete.")
 
-        # refit after cross_validation — cv resets internal model state in MLForecast
-        print("Refitting after CV...")
-        mlf_best.fit(input_data)
-        print("Refit complete.")
+        # ── 3. Final fit on full data so forecast extends into the future ─────
+        fit_data = full_data if full_data is not None else input_data
+        print(f"Fitting final model on {'full' if full_data is not None else 'train'} "
+              f"dataset (last obs: {fit_data['ds'].max().date()})...")
+        mlf_best = self._get_mlforecast(XGBRegressor(**best, verbosity=0))
+        mlf_best.fit(fit_data)
+        print("Fit complete.")
 
-        # ── 4. Persist model pickle to S3 ────────────────────────────────────
-        print("Saving model pickle...")
+        # ── 4. Persist model pickle to S3 ─────────────────────────────────────
+        import boto3
+        s3 = boto3.client("s3")
         local_pkl = os.path.join(
             self.forecast_models_dir,
             f"model_{self.aoi_name}_{run_date}.pkl"
@@ -272,12 +274,10 @@ class ForecastTS:
         with open(local_pkl, "wb") as f:
             pickle.dump(mlf_best, f)
 
-        s3 = boto3.client("s3")
         model_key = f"{self.country}/{self.aoi_name}/ml/model_{self.aoi_name}_{run_date}.pkl"
         s3.upload_file(local_pkl, BUCKET_NAME, model_key)
         print(f"Model written to: s3://{BUCKET_NAME}/{model_key}")
 
-        # log artifact to mlflow — never fatal
         try:
             with mlflow.start_run(run_name=f"{self.aoi_name}_best_model"):
                 mlflow.log_artifact(local_pkl)
@@ -286,7 +286,7 @@ class ForecastTS:
         except Exception as e:
             print(f"MLflow artifact logging warning (non-fatal): {e}")
 
-        # ── 5. Generate forecast ──────────────────────────────────────────────
+        # ── 5. Generate forecast (future dates) ───────────────────────────────
         print("Generating forecast...")
         try:
             forecast = mlf_best.predict(h=forecast_horizon)
@@ -297,21 +297,22 @@ class ForecastTS:
             forecast.to_parquet(forecast_s3, index=False)
             print(f"Forecast written to: {forecast_s3}")
         except Exception as e:
+            import traceback
             print(f"ERROR writing forecast: {e}")
             traceback.print_exc()
             raise
 
-        # ── 6. Persist metrics JSON to S3 ─────────────────────────────────────
+        # ── 6. Persist metrics JSON ────────────────────────────────────────────
         print("Writing metrics...")
         try:
             self._write_metrics(run_date, best, study.best_value, cv_best)
         except Exception as e:
+            import traceback
             print(f"ERROR writing metrics: {e}")
             traceback.print_exc()
             raise
 
         return forecast
-
 
     def predict_xgb(self,
                     forecast_horizon: int) -> pd.DataFrame:

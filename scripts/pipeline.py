@@ -2,10 +2,8 @@
 
 import json
 import datetime
-import os
 
 import boto3
-import dotenv
 import duckdb
 import pandas as pd
 
@@ -14,13 +12,8 @@ from scripts.forecast_ts import ForecastTS
 from scripts.process_ts import DataAnalysis
 from scripts.read_bucket import DataReader
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
-
-print(f"Using S3 bucket: {BUCKET_NAME}")
+import os
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "environment-monitor")
 
 
 class Pipeline:
@@ -28,11 +21,11 @@ class Pipeline:
     End-to-end ML pipeline for a single AOI.
 
     S3 structure assumed:
-        s3://{BUCKET_NAME}/aois.json
-        s3://{BUCKET_NAME}/{country}/{aoi_name}/ts/*.parquet
-        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
-        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
-        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
+        s3://env_monitor/aois.json
+        s3://env_monitor/{country}/{aoi_name}/ts/*.parquet
+        s3://env_monitor/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
+        s3://env_monitor/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
+        s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
     """
 
     def __init__(self,
@@ -52,9 +45,11 @@ class Pipeline:
         self.conn = duckdb.connect()
         self.conn.execute("INSTALL spatial;")
         self.conn.execute("LOAD spatial;")
-        self.conn.execute("""CREATE SECRET (
+        self.conn.execute(f"""CREATE SECRET (
                         TYPE s3,
-                        PROVIDER credential_chain
+                        KEY_ID '{os.getenv("AWS_ACCESS_KEY_ID")}',
+                        SECRET '{os.getenv("AWS_SECRET_ACCESS_KEY")}',
+                        REGION '{os.getenv("AWS_DEFAULT_REGION", "us-east-1")}'
                         );
                      """)
 
@@ -72,7 +67,7 @@ class Pipeline:
         """
         Add or update this AOI's entry in the top-level aois.json registry.
 
-        Reads s3://{BUCKET_NAME}/aois.json, upserts this AOI under its
+        Reads s3://env_monitor/aois.json, upserts this AOI under its
         country key, and writes the file back.
 
         Parameters
@@ -256,7 +251,9 @@ class Pipeline:
         print(f"Total train shape: {train_df.shape}")
         print(f"Total test shape:  {test_df.shape}")
 
-        forecast = forecast_ts.forecast_xgb(train_df, h)
+        # Pass full dataset so the final model fit anchors forecasts
+        # to the end of all available data, not just the train split
+        forecast = forecast_ts.forecast_xgb(train_df, h, full_data=input_df)
 
         # Load the metrics just written to check MAE
         try:
