@@ -238,9 +238,17 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],
 server = app.server
 
 app.layout = html.Div([
+    dcc.Store(id="last-refresh", data=date.today().isoformat()),
     html.Div([
         html.Span("Environmental Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
-        html.Span(f"Last refreshed: {date.today().isoformat()}", style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginLeft":"auto"}),
+        html.Div([
+            html.Span(id="refresh-timestamp", style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginRight":"12px"}),
+            html.Button("↻ Refresh", id="refresh-btn", n_clicks=0, style={
+                "fontSize":"12px","padding":"4px 12px","borderRadius":"6px","cursor":"pointer",
+                "border":"0.5px solid rgba(232, 231, 226, 1)","background":"rgba(247, 246, 242, 1)",
+                "color":"rgba(26, 26, 24, 1)",
+            }),
+        ], style={"display":"flex","alignItems":"center","marginLeft":"auto"}),
     ], style={"display":"flex","alignItems":"center","padding":"10px 20px",
               "background":"rgba(255, 255, 255, 1)","borderBottom":"1px solid rgba(232, 231, 226, 1)","height":"44px"}),
 
@@ -278,14 +286,37 @@ app.layout = html.Div([
               "fontFamily":"'IBM Plex Sans',sans-serif","background":"rgba(244, 243, 239, 1)"})
 # ── Callbacks ──────────────────────────────────────────────────────────────────
 
+
+@callback(
+    Output("last-refresh", "data"),
+    Output("refresh-timestamp", "children"),
+    Output("aoi-dropdown", "value"),
+    Input("refresh-btn", "n_clicks"),
+    Input("aoi-dropdown", "value"),
+    prevent_initial_call=False,
+)
+def handle_refresh(n_clicks, current_value):
+    """Update timestamp and re-trigger all data callbacks by toggling dropdown value."""
+    from dash import ctx
+    now = date.today().isoformat()
+    label = f"Last refreshed: {now}"
+    # On refresh button click, keep the same AOI but reset to re-trigger callbacks
+    if ctx.triggered_id == "refresh-btn" and n_clicks and n_clicks > 0:
+        print(f"Manual refresh triggered at {now}")
+    return now, label, current_value
+
+
 @callback(Output("aoi-dropdown","options"), Output("aoi-dropdown","value"),
-          Input("aoi-dropdown","id"))
+          Output("refresh-timestamp","children", allow_duplicate=True),
+          Input("aoi-dropdown","id"),
+          prevent_initial_call=False)
 def populate_dropdown(_):
     registry = load_aois()
     opts = [{"label": f"{a['aoi_name']} ({c})",
              "value": json.dumps({"country": c, "aoi_name": a["aoi_name"]})}
             for c, aois in registry.items() for a in aois]
-    return opts, (opts[0]["value"] if opts else None)
+    timestamp = f"Last refreshed: {date.today().isoformat()}"
+    return opts, (opts[0]["value"] if opts else None), timestamp
 
 
 @callback(Output("aoi-map","center"), Output("aoi-map","zoom"), Output("map-layers","children"),
