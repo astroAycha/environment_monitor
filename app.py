@@ -238,11 +238,12 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],
 server = app.server
 
 app.layout = html.Div([
-    dcc.Store(id="last-refresh", data=date.today().isoformat()),
+    dcc.Store(id="refresh-store", data=0),
     html.Div([
         html.Span("Environmental Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
         html.Div([
-            html.Span(id="refresh-timestamp", style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginRight":"12px"}),
+            html.Span(id="refresh-timestamp", children=f"Last refreshed: {date.today().isoformat()}",
+                      style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginRight":"12px"}),
             html.Button("↻ Refresh", id="refresh-btn", n_clicks=0, style={
                 "fontSize":"12px","padding":"4px 12px","borderRadius":"6px","cursor":"pointer",
                 "border":"0.5px solid rgba(232, 231, 226, 1)","background":"rgba(247, 246, 242, 1)",
@@ -288,40 +289,32 @@ app.layout = html.Div([
 
 
 @callback(
-    Output("last-refresh", "data"),
+    Output("refresh-store", "data"),
     Output("refresh-timestamp", "children"),
-    Output("aoi-dropdown", "value"),
     Input("refresh-btn", "n_clicks"),
-    Input("aoi-dropdown", "value"),
-    prevent_initial_call=False,
+    prevent_initial_call=True,
 )
-def handle_refresh(n_clicks, current_value):
-    """Update timestamp and re-trigger all data callbacks by toggling dropdown value."""
-    from dash import ctx
-    now = date.today().isoformat()
-    label = f"Last refreshed: {now}"
-    # On refresh button click, keep the same AOI but reset to re-trigger callbacks
-    if ctx.triggered_id == "refresh-btn" and n_clicks and n_clicks > 0:
-        print(f"Manual refresh triggered at {now}")
-    return now, label, current_value
+def handle_refresh(n_clicks):
+    """Increment store counter to re-trigger all data callbacks."""
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    print(f"Manual refresh at {now}")
+    return n_clicks, f"Last refreshed: {now}"
 
 
 @callback(Output("aoi-dropdown","options"), Output("aoi-dropdown","value"),
-          Output("refresh-timestamp","children", allow_duplicate=True),
-          Input("aoi-dropdown","id"),
-          prevent_initial_call=False)
+          Input("aoi-dropdown","id"))
 def populate_dropdown(_):
     registry = load_aois()
     opts = [{"label": f"{a['aoi_name']} ({c})",
              "value": json.dumps({"country": c, "aoi_name": a["aoi_name"]})}
             for c, aois in registry.items() for a in aois]
-    timestamp = f"Last refreshed: {date.today().isoformat()}"
-    return opts, (opts[0]["value"] if opts else None), timestamp
+    return opts, (opts[0]["value"] if opts else None)
 
 
 @callback(Output("aoi-map","center"), Output("aoi-map","zoom"), Output("map-layers","children"),
-          Input("aoi-dropdown","value"))
-def update_map(aoi_value):
+          Input("aoi-dropdown","value"), Input("refresh-store","data"))
+def update_map(aoi_value, _r=None):
     parsed = parse_sel(aoi_value)
     if not parsed:
         return [33.5,36.3], 13, []
@@ -344,8 +337,8 @@ def update_map(aoi_value):
              dl.Marker(position=[lat,lon], children=dl.Tooltip(aoi_name))])
 
 
-@callback(Output("status-panel","children"), Input("aoi-dropdown","value"))
-def update_status(aoi_value):
+@callback(Output("status-panel","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
+def update_status(aoi_value, _r=None):
     parsed = parse_sel(aoi_value)
     if not parsed:
         return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
@@ -368,8 +361,8 @@ def update_status(aoi_value):
     return html.Div(rows)
 
 
-@callback(Output("metrics-panel","children"), Input("aoi-dropdown","value"))
-def update_metrics(aoi_value):
+@callback(Output("metrics-panel","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
+def update_metrics(aoi_value, _r=None):
     parsed = parse_sel(aoi_value)
     if not parsed:
         return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
@@ -390,8 +383,8 @@ def update_metrics(aoi_value):
                               style={"fontSize":"11px","color":"rgba(170, 170, 170, 1)","marginTop":"6px"})])
 
 
-@callback(Output("stats-panel","children"), Input("aoi-dropdown","value"))
-def update_stats(aoi_value):
+@callback(Output("stats-panel","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
+def update_stats(aoi_value, _r=None):
     parsed = parse_sel(aoi_value)
     if not parsed:
         return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
@@ -416,8 +409,8 @@ def update_stats(aoi_value):
     return html.Div(rows)
 
 
-@callback(Output("summary-row","children"), Input("aoi-dropdown","value"))
-def update_summary(aoi_value):
+@callback(Output("summary-row","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
+def update_summary(aoi_value, _r=None):
     parsed = parse_sel(aoi_value)
     if not parsed:
         return dbc.Row([])
@@ -448,8 +441,9 @@ def update_summary(aoi_value):
 
 
 def make_chart_callback(key, chart_id):
-    @callback(Output(chart_id,"figure"), Input("aoi-dropdown","value"))
-    def _cb(aoi_value, _key=key):
+    @callback(Output(chart_id,"figure"), Input("aoi-dropdown","value"),
+              Input("refresh-store","data"))
+    def _cb(aoi_value, _r=None, _key=key):
         parsed = parse_sel(aoi_value)
         if not parsed:
             return go.Figure()
