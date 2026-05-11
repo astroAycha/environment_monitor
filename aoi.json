@@ -1,93 +1,104 @@
 {
-    "type": "FeatureCollection",
-    "features": [
-        {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [-80.435, 43.407] 
-        },
-        "properties": {
-            "country": "canada",
-            "aoi_id": "kitchener_waterloo",
-            "application": "urban",
-            "buffer_meters": 5000
-    }},
-        {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [-65.167, 44.885] 
-        },
-        "properties": {
-            "country": "canada",
-            "aoi_id": "cogs_lawrencetown",
-            "application": "cogs",
-            "buffer_meters": 4000
-    }},
-        {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [36.688, 36.310]
-        },
-        "properties": {
-            "country": "syria",
-            "aoi_id": "atamah_camp",
-            "application": "refugee_camps",
-            "buffer_meters": 4000
-    }},
-        {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [35.952, 34.824]
-        },
-        "properties": {
-            "country": "syria",
-            "aoi_id": "qastal_maaf",
-            "application": "wildfires",
-            "buffer_meters": 3000
-    }},
-        {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [36.102, 32.887]
-        },
-        "properties": {
-            "country": "syria",
-            "aoi_id": "near_nuwa",
-            "application": "soil_moisture",
-            "buffer_meters": 4000
-    }},
-    {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [-79.399, 43.667]
-        },
-        "properties": {
-            "country": "canada",
-            "aoi_id": "toronto",
-            "application": "urban",
-            "buffer_meters": 4000
-    }},
-    {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [-118.072, 52.868]
-        },
-        "properties": {
-            "country": "canada",
-            "aoi_id": "jasper",
-            "application": "wildfires",
-            "buffer_meters": 20000
-    }},
-    {"type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [88.599, 24.374]
-        },
-        "properties": {
-            "country": "bangladesh",
-            "aoi_id": "rajashahi",
-            "application": "droughts",
-            "buffer_meters": 4000
-    }}
-    ]
+  "canada": [
+    {
+      "aoi_id": "kitchener_waterloo",
+      "lat": 43.407,
+      "lon": -80.435,
+      "radius_m": 5000,
+      "bbox": [
+        -80.49675001552282,
+        43.36197977565508,
+        -80.37325095188174,
+        43.452019865318434
+      ]
+    },
+    {
+      "aoi_id": "cogs_lawrencetown",
+      "lat": 44.885,
+      "lon": -65.167,
+      "radius_m": 4000,
+      "bbox": [
+        -65.21761278999996,
+        44.84901722831318,
+        -65.11638467273433,
+        44.92098251195109
+      ]
+    },
+    {
+      "aoi_id": "toronto",
+      "lat": 43.667,
+      "lon": -79.399,
+      "radius_m": 4000,
+      "bbox": [
+        -79.44859623913268,
+        43.63099781736294,
+        -79.34940553501146,
+        43.70300193821728
+      ]
+    },
+    {
+      "aoi_id": "jasper",
+      "lat": 52.868,
+      "lon": -118.072,
+      "radius_m": 20000,
+      "bbox": [
+        -118.36903337690157,
+        52.68823600528172,
+        -117.77491946117588,
+        53.047758260441725
+      ]
+    }
+  ],
+  "syria": [
+    {
+      "aoi_id": "atamah_camp",
+      "lat": 36.31,
+      "lon": 36.688,
+      "radius_m": 4000,
+      "bbox": [
+        36.643480780053956,
+        36.273967410818216,
+        36.732521110322224,
+        36.34603234456704
+      ]
+    },
+    {
+      "aoi_id": "qastal_maaf",
+      "lat": 35.824,
+      "lon": 35.952,
+      "radius_m": 3000,
+      "bbox": [
+        35.91923699895754,
+        34.79698282675849,
+        35.98476171697137,
+        34.85101702965193
+      ]
+    },
+    {
+      "aoi_id": "near_nuwa",
+      "lat": 32.887,
+      "lon": 36.102,
+      "radius_m": 4000,
+      "bbox": [
+        36.05929106242298,
+        32.85096400993659,
+        36.144711029867764,
+        32.92303574485554
+      ]
+    }
+  ],
+  "bangladesh": [
+    {
+      "aoi_id": "rajashahi",
+      "lat": 24.374,
+      "lon": 88.599,
+      "radius_m": 4000,
+      "bbox": [
+        88.55957307990005,
+        24.337886662377475,
+        88.63842603025569,
+        24.410113157632303
+      ]
+    }
+  ]
 }
