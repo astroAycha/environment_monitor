@@ -293,14 +293,14 @@ app.layout = html.Div([
                 html.Div([
                     html.Span("Data: ", style={"color":"rgba(136,136,136,1)","fontSize":"12px"}),
                     html.A("Sentinel-2 via AWS Earth Search",
-                           href="https://earth-search.aws.element84.com/v1",
+                           href="https://radiantearth.github.io/stac-browser/#/external/earth-search.aws.element84.com/v1/collections/sentinel-2-l2a",
                            target="_blank",
                            style={"fontSize":"12px","color":"rgba(55,138,221,1)"}),
                 ], style={"marginBottom":"5px"}),
                 html.Div([
                     html.Span("Data: ", style={"color":"rgba(136,136,136,1)","fontSize":"12px"}),
                     html.A("HLS via Microsoft Planetary Computer",
-                           href="https://planetarycomputer.microsoft.com",
+                           href="https://planetarycomputer.microsoft.com/dataset/group/hls2",
                            target="_blank",
                            style={"fontSize":"12px","color":"rgba(55,138,221,1)"}),
                 ], style={"marginBottom":"10px"}),
