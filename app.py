@@ -234,7 +234,7 @@ SEC     = {"fontSize":"10px","fontWeight":"600","color":"rgba(136, 136, 136, 1)"
            "letterSpacing":"0.08em","marginBottom":"8px"}
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],
-                title="Env Monitor", suppress_callback_exceptions=True)
+                title="Environmental Change Monitor", suppress_callback_exceptions=True)
 server = app.server
 
 app.layout = html.Div([
@@ -242,7 +242,7 @@ app.layout = html.Div([
     dcc.Download(id="download-ts"),
     dcc.Download(id="download-forecast"),
     html.Div([
-        html.Span("Environmental Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
+        html.Span("Environmental Change Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
         html.Div([
             html.Span(id="refresh-timestamp", children=f"Last refreshed: {date.today().isoformat()}",
                       style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginRight":"12px"}),
