@@ -318,7 +318,7 @@ app.layout = html.Div([
                     html.Span("Questions? ",
                               style={"fontSize":"12px","color":"rgba(136,136,136,1)"}),
                     html.A("Get in touch",
-                           href="mailto:contact@aychatammour.com",
+                           href="mailto:aycha.tammour@gmail.com",
                            style={"fontSize":"12px","color":"rgba(55,138,221,1)"}),
                 ]),
             ]),
