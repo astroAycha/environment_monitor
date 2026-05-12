@@ -239,6 +239,8 @@ server = app.server
 
 app.layout = html.Div([
     dcc.Store(id="refresh-store", data=0),
+    dcc.Download(id="download-ts"),
+    dcc.Download(id="download-forecast"),
     html.Div([
         html.Span("Environmental Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
         html.Div([
@@ -262,6 +264,65 @@ app.layout = html.Div([
             html.Div([html.Div("Pipeline status",  style=SEC), html.Div(id="status-panel")]),
             html.Div([html.Div("Model metrics",    style=SEC), html.Div(id="metrics-panel")]),
             html.Div([html.Div("Index statistics", style=SEC), html.Div(id="stats-panel")]),
+
+            # ── Download ──────────────────────────────────────────────────────
+            html.Div([
+                html.Div("Download data", style=SEC),
+                html.Button("⬇ Time series (CSV)", id="btn-dl-ts",
+                    n_clicks=0, style={
+                        "width":"100%","marginBottom":"6px","padding":"7px 10px",
+                        "fontSize":"12px","borderRadius":"6px","cursor":"pointer",
+                        "border":"0.5px solid rgba(232,231,226,1)",
+                        "background":"rgba(247,246,242,1)","color":"rgba(26,26,24,1)",
+                        "textAlign":"left",
+                    }),
+                html.Button("⬇ Forecast (CSV)", id="btn-dl-forecast",
+                    n_clicks=0, style={
+                        "width":"100%","padding":"7px 10px",
+                        "fontSize":"12px","borderRadius":"6px","cursor":"pointer",
+                        "border":"0.5px solid rgba(232,231,226,1)",
+                        "background":"rgba(247,246,242,1)","color":"rgba(26,26,24,1)",
+                        "textAlign":"left",
+                    }),
+            ]),
+
+            # ── About / credits ───────────────────────────────────────────────
+            html.Div(style={"marginTop":"auto","paddingTop":"16px",
+                            "borderTop":"0.5px solid rgba(232,231,226,1)"}, children=[
+                html.Div("About", style=SEC),
+                html.Div([
+                    html.Span("Data: ", style={"color":"rgba(136,136,136,1)","fontSize":"12px"}),
+                    html.A("Sentinel-2 via AWS Earth Search",
+                           href="https://earth-search.aws.element84.com/v1",
+                           target="_blank",
+                           style={"fontSize":"12px","color":"rgba(55,138,221,1)"}),
+                ], style={"marginBottom":"5px"}),
+                html.Div([
+                    html.Span("Data: ", style={"color":"rgba(136,136,136,1)","fontSize":"12px"}),
+                    html.A("HLS via Microsoft Planetary Computer",
+                           href="https://planetarycomputer.microsoft.com",
+                           target="_blank",
+                           style={"fontSize":"12px","color":"rgba(55,138,221,1)"}),
+                ], style={"marginBottom":"10px"}),
+                html.Div([
+                    html.A("⌥ GitHub repo",
+                           href="https://github.com/astroAycha/geospatial_mlops",
+                           target="_blank",
+                           style={"fontSize":"12px","color":"rgba(55,138,221,1)",
+                                  "display":"block","marginBottom":"5px"}),
+                    html.A("◎ aychatammour.com",
+                           href="https://aychatammour.com",
+                           target="_blank",
+                           style={"fontSize":"12px","color":"rgba(55,138,221,1)",
+                                  "display":"block","marginBottom":"5px"}),
+                    html.Span("Questions? ",
+                              style={"fontSize":"12px","color":"rgba(136,136,136,1)"}),
+                    html.A("Get in touch",
+                           href="mailto:contact@aychatammour.com",
+                           style={"fontSize":"12px","color":"rgba(55,138,221,1)"}),
+                ]),
+            ]),
+
         ], style=SIDEBAR),
 
         html.Div([
@@ -459,6 +520,59 @@ def make_chart_callback(key, chart_id):
 for _key, _id in [("ndvi","chart-ndvi"),("bsi","chart-bsi"),
                    ("ndmi","chart-ndmi"),("nbr","chart-nbr")]:
     make_chart_callback(_key, _id)
+
+
+
+# ── Download callbacks ─────────────────────────────────────────────────────────
+
+@callback(
+    Output("download-ts", "data"),
+    Input("btn-dl-ts", "n_clicks"),
+    Input("aoi-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def download_ts(n_clicks, aoi_value):
+    """Download full time series as CSV."""
+    from dash import ctx
+    if ctx.triggered_id != "btn-dl-ts" or not aoi_value:
+        return dash.no_update
+    parsed = parse_sel(aoi_value)
+    if not parsed:
+        return dash.no_update
+    country, aoi_name = parsed
+    ts_df = read_ts(country, aoi_name)
+    if ts_df.empty:
+        return dash.no_update
+    filename = f"{aoi_name}_time_series.csv"
+    return dcc.send_data_frame(ts_df.to_csv, filename, index=False)
+
+
+@callback(
+    Output("download-forecast", "data"),
+    Input("btn-dl-forecast", "n_clicks"),
+    Input("aoi-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def download_forecast(n_clicks, aoi_value):
+    """Download latest forecast as CSV."""
+    from dash import ctx
+    if ctx.triggered_id != "btn-dl-forecast" or not aoi_value:
+        return dash.no_update
+    parsed = parse_sel(aoi_value)
+    if not parsed:
+        return dash.no_update
+    country, aoi_name = parsed
+    fc_df = read_forecasts(country, aoi_name)
+    if fc_df.empty:
+        return dash.no_update
+    # Rename columns to be more user-friendly
+    fc_df = fc_df.rename(columns={
+        "unique_id": "index",
+        "ds": "date",
+        "XGBRegressor": "forecast_value",
+    })
+    filename = f"{aoi_name}_forecast.csv"
+    return dcc.send_data_frame(fc_df.to_csv, filename, index=False)
 
 
 if __name__ == "__main__":
