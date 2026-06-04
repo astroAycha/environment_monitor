@@ -23,7 +23,6 @@ xgboost==3.2.0
 
 # --- MLOps ---
 mlflow==3.11.1
-apache-airflow
 
 # --- Geo/EO ---
 odc-stac
@@ -31,6 +30,7 @@ pystac-client==0.9.0
 planetary-computer==1.0.0
 folium==0.20.0
 jsonschema==4.26.0
+geopandas>=0.14
 
 # --- App / UI ---
 streamlit==1.44.0
@@ -47,3 +47,4 @@ seaborn
 
 # --- Utils ---
 python-dotenv==1.2.2
+boto3>=1.34
