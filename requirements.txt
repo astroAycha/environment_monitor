@@ -22,6 +22,7 @@ pandas
 pyarrow
 xarray==2025.12.0
 duckdb==1.5.2
+boto3>=1.34
 
 # --- ML (inference only, no training) ---
 scikit-learn==1.8.0
