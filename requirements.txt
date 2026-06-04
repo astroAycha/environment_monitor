@@ -17,7 +17,7 @@ xarray==2025.12.0
 # --- Forecasting ---
 mlforecast==1.0.31
 optuna==4.8.0
-sktime==0.40.1
+# sktime==0.40.1
 utilsforecast
 xgboost==3.2.0
 
