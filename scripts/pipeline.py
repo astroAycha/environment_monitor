@@ -13,7 +13,7 @@ from scripts.process_ts import DataAnalysis
 from scripts.read_bucket import DataReader
 
 import os
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "environment-monitor")
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
 
 class Pipeline:
@@ -21,11 +21,11 @@ class Pipeline:
     End-to-end ML pipeline for a single AOI.
 
     S3 structure assumed:
-        s3://env_monitor/aois.json
-        s3://env_monitor/{country}/{aoi_name}/ts/*.parquet
-        s3://env_monitor/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
-        s3://env_monitor/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
-        s3://env_monitor/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
+        s3://{BUCKET_NAME}/aois.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ts/*.parquet
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/model_{aoi_name}_{date}.pkl
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/metrics_{aoi_name}_{date}.json
+        s3://{BUCKET_NAME}/{country}/{aoi_name}/ml/forecast_{aoi_name}_{date}.parquet
     """
 
     def __init__(self,
