@@ -17,6 +17,8 @@ import sys
 from scripts.pipeline import Pipeline
 from scripts.read_bucket import DataReader
 
+
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
