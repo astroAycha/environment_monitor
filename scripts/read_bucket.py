@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "environment-monitor")
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
 
 class DataReader:
