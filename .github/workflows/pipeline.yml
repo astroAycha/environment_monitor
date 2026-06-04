@@ -24,6 +24,8 @@ jobs:
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
       AWS_STAC_API_URL: ${{ vars.AWS_STAC_API_URL }}
       MPC_STAC_API_URL: ${{ vars.MPC_STAC_API_URL }}
+      AOI_NAME: ${{ github.event.inputs.aoi_name }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
 
     steps:
       - name: Checkout repository
