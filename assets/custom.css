@@ -1,0 +1,116 @@
+/* ── Layout shells (replace the old inline SIDEBAR/MAIN style dicts) ── */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: rgba(244, 243, 239, 1);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 1);
+  border-bottom: 1px solid rgba(232, 231, 226, 1);
+  height: 44px;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.app-sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: rgba(255, 255, 255, 1);
+  border-right: 1px solid rgba(232, 231, 226, 1);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(244, 243, 239, 1);
+}
+
+.app-map-wrap {
+  height: 360px;
+  position: relative;
+}
+
+.app-content {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Phones & small tablets ── */
+@media (max-width: 768px) {
+  .app-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    min-width: 0;
+    max-height: 42vh;      /* keep sidebar from eating the whole screen */
+    border-right: none;
+    border-bottom: 1px solid rgba(232, 231, 226, 1);
+  }
+
+  .app-main {
+    overflow: visible;
+  }
+
+  .app-map-wrap {
+    height: 240px;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 14px;
+    row-gap: 6px;
+  }
+
+  .app-header-right {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .app-content {
+    padding: 12px 14px;
+  }
+}
+
+/* ── Bigger touch targets on small phones ── */
+@media (max-width: 480px) {
+  button {
+    min-height: 40px;
+  }
+
+  /* Dash dropdown control */
+  .Select-control,
+  .dash-dropdown .Select-control {
+    min-height: 40px;
+  }
+}
