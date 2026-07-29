@@ -396,7 +396,7 @@ app.layout = html.Div([
 
         html.Div([
             html.Div([
-                dl.Map(id="aoi-map", center=[33.5,36.3], zoom=13,
+                dl.Map(id="aoi-map", center=[33.5,36.3], zoom=10,
                        children=[dl.TileLayer(url=TILE_URL, attribution=TILE_ATTRIBUTION),
                                  dl.LayerGroup(id="map-layers")],
                        style={"width":"100%","height":"100%"}),
