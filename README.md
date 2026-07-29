@@ -1,13 +1,3 @@
----
-title: Environmental Monitor
-emoji: 🛰️
-colorFrom: green
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: true
----
-
 # Environmental Monitor
 
 A geospatial MLOps dashboard for monitoring spectral indices derived from
