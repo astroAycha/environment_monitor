@@ -1,5 +1,4 @@
 name: Sync to Hugging Face Spaces
-
 on:
   push:
     branches: [main]
@@ -9,7 +8,6 @@ jobs:
   sync-to-hf:
     name: Push to HF Space
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,8 +15,21 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Build HF-only tree
+        run: |
+          mkdir -p /tmp/hf_deploy/scripts
+          # copy only what the Space needs
+          cp -r app.py requirements-dashboard.txt assets /tmp/hf_deploy/
+          cp README.hf.md /tmp/hf_deploy/README.md   # <-- HF-specific README with front matter
+          # add anything else the Space needs, e.g. Dockerfile
+          cp Dockerfile /tmp/hf_deploy/
+
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          cd /tmp/hf_deploy
+          git init
+          git add .
+          git commit -m "Sync from GitHub Actions"
           git push -f https://astroAycha:$HF_TOKEN@huggingface.co/spaces/astroAycha/environment_monitor HEAD:main
