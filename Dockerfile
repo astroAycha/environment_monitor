@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY app.py .
 COPY scripts/ scripts/
+COPY assets/ assets/
 
 # HF Spaces runs containers as a non-root user (uid 1000)
 RUN useradd -m -u 1000 appuser && chown -R appuser /app
