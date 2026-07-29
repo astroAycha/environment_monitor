@@ -1,5 +1,12 @@
 /* ── Layout shells (replace the old inline SIDEBAR/MAIN style dicts) ── */
 
+button {
+  font-family: inherit;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -14,7 +21,7 @@
   padding: 10px 20px;
   background: rgba(255, 255, 255, 1);
   border-bottom: 1px solid rgba(232, 231, 226, 1);
-  height: 44px;
+  min-height: 44px;  
 }
 
 .app-header-right {

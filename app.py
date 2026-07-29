@@ -13,6 +13,14 @@ Mobile-responsiveness notes (2026-07):
 - Chart and stat-card columns now use responsive dbc.Col breakpoints
   (xs=/sm=/md=) instead of a single fixed `width=`, so they stack on
   phones and grid on desktop.
+- Header now carries a title + subtitle block. Fixed: a stray unclosed
+  html.Div([ was wrapping the header+body, causing a SyntaxError; removed
+  it since header/body can be direct children of the shell div. Also
+  gave the Refresh button an explicit fontFamily/box-sizing reset inline
+  (in addition to the same reset in custom.css) since <button> elements
+  don't inherit font-family by default — without it the button renders
+  in the browser's system font instead of IBM Plex Sans, which reads
+  larger/heavier than the title even at a smaller font-size.
 """
 
 import json
@@ -251,17 +259,68 @@ app.layout = html.Div([
     dcc.Download(id="download-forecast"),
 
     html.Div([
-        html.Span("Environmental Change Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
         html.Div([
-            html.Span(id="refresh-timestamp", children=f"Last refreshed: {date.today().isoformat()}",
-                      style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginRight":"12px"}),
-            html.Button("↻ Refresh", id="refresh-btn", n_clicks=0, style={
-                "fontSize":"12px","padding":"4px 12px","borderRadius":"6px","cursor":"pointer",
-                "border":"0.5px solid rgba(232, 231, 226, 1)","background":"rgba(247, 246, 242, 1)",
-                "color":"rgba(26, 26, 24, 1)",
-            }),
-        ], className="app-header-right"),
-    ], className="app-header"),
+            html.Span(
+                "Environmental Change Monitor",
+                style={
+                    "fontSize":"18px",
+                    "fontWeight":"700",
+                    "color":"rgba(26, 26, 24, 1)",
+                    "display":"block",
+                    "lineHeight":"1.2",
+                },
+            ),
+            html.Span(
+                "Automated tracking & forecasts powered by machine learning",
+                style={
+                    "fontSize":"11px",
+                    "color":"rgba(136, 136, 136, 1)",
+                    "display":"block",
+                    "marginTop":"2px",
+                    "lineHeight":"1.2",
+                },
+            ),
+        ], style={"minWidth": 0}),
+        html.Div([
+            html.Span(
+                id="refresh-timestamp",
+                children="",
+                style={"fontSize":"10px", "color":"rgba(136, 136, 136, 1)"},
+            ),
+            html.Button(
+                "↻ Refresh",
+                id="refresh-btn",
+                n_clicks=0,
+                style={
+                    "padding":"3px 7px",
+                    "fontSize":"11px",
+                    "fontFamily":"inherit",
+                    "boxSizing":"border-box",
+                    "lineHeight":"1",
+                    "minHeight":"22px",
+                    "borderRadius":"6px",
+                    "border":"0.5px solid rgba(232,231,226,1)",
+                    "background":"rgba(247,246,242,1)",
+                    "color":"rgba(26,26,24,1)",
+                    "cursor":"pointer",
+                },
+            ),
+        ], className="app-header-right", style={
+            "display":"flex",
+            "alignItems":"center",
+            "gap":"6px",
+            "marginLeft":"auto",
+            "flexShrink":"0",
+            "whiteSpace":"nowrap",
+        }),
+    ], className="app-header", style={
+        "display":"flex",
+        "justifyContent":"space-between",
+        "alignItems":"center",
+        "gap":"12px",
+        "padding":"10px 16px",
+        "flexWrap":"wrap",
+    }),
 
     html.Div([
         html.Div([
@@ -279,7 +338,8 @@ app.layout = html.Div([
                 html.Button("⬇ Time series (CSV)", id="btn-dl-ts",
                     n_clicks=0, style={
                         "width":"100%","marginBottom":"6px","padding":"7px 10px",
-                        "fontSize":"12px","borderRadius":"6px","cursor":"pointer",
+                        "fontSize":"12px","fontFamily":"inherit","boxSizing":"border-box",
+                        "borderRadius":"6px","cursor":"pointer",
                         "border":"0.5px solid rgba(232,231,226,1)",
                         "background":"rgba(247,246,242,1)","color":"rgba(26,26,24,1)",
                         "textAlign":"left",
@@ -287,7 +347,8 @@ app.layout = html.Div([
                 html.Button("⬇ Forecast (CSV)", id="btn-dl-forecast",
                     n_clicks=0, style={
                         "width":"100%","padding":"7px 10px",
-                        "fontSize":"12px","borderRadius":"6px","cursor":"pointer",
+                        "fontSize":"12px","fontFamily":"inherit","boxSizing":"border-box",
+                        "borderRadius":"6px","cursor":"pointer",
                         "border":"0.5px solid rgba(232,231,226,1)",
                         "background":"rgba(247,246,242,1)","color":"rgba(26,26,24,1)",
                         "textAlign":"left",
