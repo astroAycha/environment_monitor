@@ -5,6 +5,22 @@ sys.stdout = sys.__stdout__  # force unbuffered output in HF Spaces container
 """
 Environmental Monitoring Dashboard — Dash app for Hugging Face Spaces.
 Reads directly from S3 via DuckDB per callback. No dcc.Store serialisation.
+
+Mobile-responsiveness notes (2026-07):
+- Layout shells (header/sidebar/main/map wrapper) moved from inline style
+  dicts to CSS classes in assets/custom.css, since inline styles can't
+  hold @media queries.
+- Chart and stat-card columns now use responsive dbc.Col breakpoints
+  (xs=/sm=/md=) instead of a single fixed `width=`, so they stack on
+  phones and grid on desktop.
+- Header now carries a title + subtitle block. Fixed: a stray unclosed
+  html.Div([ was wrapping the header+body, causing a SyntaxError; removed
+  it since header/body can be direct children of the shell div. Also
+  gave the Refresh button an explicit fontFamily/box-sizing reset inline
+  (in addition to the same reset in custom.css) since <button> elements
+  don't inherit font-family by default — without it the button renders
+  in the browser's system font instead of IBM Plex Sans, which reads
+  larger/heavier than the title even at a smaller font-size.
 """
 
 import json
@@ -205,6 +221,7 @@ def make_chart(ts_df, fc_df, key):
         xaxis=dict(showgrid=True, gridcolor="rgba(232, 232, 228, 1)", zeroline=False, tickfont=dict(size=11)),
         yaxis=dict(showgrid=True, gridcolor="rgba(232, 232, 228, 1)", zeroline=False, tickfont=dict(size=11), tickformat=".3f"),
         height=240,
+        autosize=True,
     )
     return fig
 
@@ -215,7 +232,10 @@ def stat_card(label, value, sub="", color="rgba(29, 158, 117, 1)"):
         html.Div(label, style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase","letterSpacing":"0.06em","marginBottom":"4px"}),
         html.Div(value, style={"fontSize":"22px","fontWeight":"500","color":"rgba(26, 26, 24, 1)","lineHeight":"1.1"}),
         html.Div(sub,   style={"fontSize":"11px","color":"rgba(136, 136, 136, 1)","marginTop":"2px"}),
-    ], style={"background":"rgba(247, 246, 242, 1)","borderRadius":"8px","padding":"10px 14px","borderLeft":f"3px solid {color}"}), width=3)
+    ], style={"background":"rgba(247, 246, 242, 1)","borderRadius":"8px","padding":"10px 14px","borderLeft":f"3px solid {color}"}),
+    # Responsive breakpoints instead of a single fixed width: 2-up on
+    # phones, 4-up from small tablets and up.
+    xs=6, sm=6, md=3)
 
 def dot_row(color, text):
     return html.Div([
@@ -226,12 +246,8 @@ def dot_row(color, text):
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 
-SIDEBAR = {"width":"260px","minWidth":"260px","background":"rgba(255, 255, 255, 1)","borderRight":"1px solid rgba(232, 231, 226, 1)",
-           "padding":"20px 16px","display":"flex","flexDirection":"column","gap":"20px",
-           "overflowY":"auto","fontSize":"13px"}
-MAIN    = {"flex":"1","display":"flex","flexDirection":"column","overflow":"hidden","background":"rgba(244, 243, 239, 1)"}
-SEC     = {"fontSize":"10px","fontWeight":"600","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase",
-           "letterSpacing":"0.08em","marginBottom":"8px"}
+SEC = {"fontSize":"10px","fontWeight":"600","color":"rgba(136, 136, 136, 1)","textTransform":"uppercase",
+       "letterSpacing":"0.08em","marginBottom":"8px"}
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],
                 title="Environmental Change Monitor", suppress_callback_exceptions=True)
@@ -241,19 +257,70 @@ app.layout = html.Div([
     dcc.Store(id="refresh-store", data=0),
     dcc.Download(id="download-ts"),
     dcc.Download(id="download-forecast"),
+
     html.Div([
-        html.Span("Environmental Change Monitor", style={"fontSize":"15px","fontWeight":"500","color":"rgba(26, 26, 24, 1)"}),
         html.Div([
-            html.Span(id="refresh-timestamp", children=f"Last refreshed: {date.today().isoformat()}",
-                      style={"fontSize":"12px","color":"rgba(136, 136, 136, 1)","marginRight":"12px"}),
-            html.Button("↻ Refresh", id="refresh-btn", n_clicks=0, style={
-                "fontSize":"12px","padding":"4px 12px","borderRadius":"6px","cursor":"pointer",
-                "border":"0.5px solid rgba(232, 231, 226, 1)","background":"rgba(247, 246, 242, 1)",
-                "color":"rgba(26, 26, 24, 1)",
-            }),
-        ], style={"display":"flex","alignItems":"center","marginLeft":"auto"}),
-    ], style={"display":"flex","alignItems":"center","padding":"10px 20px",
-              "background":"rgba(255, 255, 255, 1)","borderBottom":"1px solid rgba(232, 231, 226, 1)","height":"44px"}),
+            html.Span(
+                "Environmental Change Monitor",
+                style={
+                    "fontSize":"18px",
+                    "fontWeight":"700",
+                    "color":"rgba(26, 26, 24, 1)",
+                    "display":"block",
+                    "lineHeight":"1.2",
+                },
+            ),
+            html.Span(
+                "Automated tracking & forecasts powered by machine learning",
+                style={
+                    "fontSize":"11px",
+                    "color":"rgba(136, 136, 136, 1)",
+                    "display":"block",
+                    "marginTop":"2px",
+                    "lineHeight":"1.2",
+                },
+            ),
+        ], style={"minWidth": 0}),
+        html.Div([
+            html.Span(
+                id="refresh-timestamp",
+                children="",
+                style={"fontSize":"10px", "color":"rgba(136, 136, 136, 1)"},
+            ),
+            html.Button(
+                "↻ Refresh",
+                id="refresh-btn",
+                n_clicks=0,
+                style={
+                    "padding":"3px 7px",
+                    "fontSize":"11px",
+                    "fontFamily":"inherit",
+                    "boxSizing":"border-box",
+                    "lineHeight":"1",
+                    "minHeight":"22px",
+                    "borderRadius":"6px",
+                    "border":"0.5px solid rgba(232,231,226,1)",
+                    "background":"rgba(247,246,242,1)",
+                    "color":"rgba(26,26,24,1)",
+                    "cursor":"pointer",
+                },
+            ),
+        ], className="app-header-right", style={
+            "display":"flex",
+            "alignItems":"center",
+            "gap":"6px",
+            "marginLeft":"auto",
+            "flexShrink":"0",
+            "whiteSpace":"nowrap",
+        }),
+    ], className="app-header", style={
+        "display":"flex",
+        "justifyContent":"space-between",
+        "alignItems":"center",
+        "gap":"12px",
+        "padding":"10px 16px",
+        "flexWrap":"wrap",
+    }),
 
     html.Div([
         html.Div([
@@ -271,7 +338,8 @@ app.layout = html.Div([
                 html.Button("⬇ Time series (CSV)", id="btn-dl-ts",
                     n_clicks=0, style={
                         "width":"100%","marginBottom":"6px","padding":"7px 10px",
-                        "fontSize":"12px","borderRadius":"6px","cursor":"pointer",
+                        "fontSize":"12px","fontFamily":"inherit","boxSizing":"border-box",
+                        "borderRadius":"6px","cursor":"pointer",
                         "border":"0.5px solid rgba(232,231,226,1)",
                         "background":"rgba(247,246,242,1)","color":"rgba(26,26,24,1)",
                         "textAlign":"left",
@@ -279,7 +347,8 @@ app.layout = html.Div([
                 html.Button("⬇ Forecast (CSV)", id="btn-dl-forecast",
                     n_clicks=0, style={
                         "width":"100%","padding":"7px 10px",
-                        "fontSize":"12px","borderRadius":"6px","cursor":"pointer",
+                        "fontSize":"12px","fontFamily":"inherit","boxSizing":"border-box",
+                        "borderRadius":"6px","cursor":"pointer",
                         "border":"0.5px solid rgba(232,231,226,1)",
                         "background":"rgba(247,246,242,1)","color":"rgba(26,26,24,1)",
                         "textAlign":"left",
@@ -323,7 +392,7 @@ app.layout = html.Div([
                 ]),
             ]),
 
-        ], style=SIDEBAR),
+        ], className="app-sidebar"),
 
         html.Div([
             html.Div([
@@ -331,21 +400,20 @@ app.layout = html.Div([
                        children=[dl.TileLayer(url=TILE_URL, attribution=TILE_ATTRIBUTION),
                                  dl.LayerGroup(id="map-layers")],
                        style={"width":"100%","height":"100%"}),
-            ], style={"height":"280px","position":"relative"}),
+            ], className="app-map-wrap"),
 
             html.Div([
                 html.Div(id="summary-row", style={"marginBottom":"12px"}),
-                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndvi", config={"displayModeBar":False}), width=6),
-                         dbc.Col(dcc.Graph(id="chart-bsi",  config={"displayModeBar":False}), width=6)],
+                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndvi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6),
+                         dbc.Col(dcc.Graph(id="chart-bsi",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6)],
                         className="g-2 mb-2"),
-                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndmi", config={"displayModeBar":False}), width=6),
-                         dbc.Col(dcc.Graph(id="chart-nbr",  config={"displayModeBar":False}), width=6)],
+                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndmi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6),
+                         dbc.Col(dcc.Graph(id="chart-nbr",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6)],
                         className="g-2"),
-            ], style={"padding":"16px 20px","overflowY":"auto","flex":"1"}),
-        ], style=MAIN),
-    ], style={"display":"flex","flex":"1","overflow":"hidden"}),
-], style={"display":"flex","flexDirection":"column","height":"100vh",
-              "fontFamily":"'IBM Plex Sans',sans-serif","background":"rgba(244, 243, 239, 1)"})
+            ], className="app-content"),
+        ], className="app-main"),
+    ], className="app-body"),
+], className="app-shell")
 # ── Callbacks ──────────────────────────────────────────────────────────────────
 
 
