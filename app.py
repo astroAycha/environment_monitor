@@ -33,7 +33,7 @@ import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output, callback, dcc, html
+from dash import Input, Output, State, callback, dcc, html
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -258,6 +258,16 @@ app.layout = html.Div([
     dcc.Download(id="download-ts"),
     dcc.Download(id="download-forecast"),
 
+    # Polls window size every 600ms and stores it only when it actually
+    # changes (e.g. on orientation rotation). Chart callbacks below take
+    # this as an Input, so a size change re-triggers them exactly the
+    # same way switching the AOI dropdown does — which is the one thing
+    # we've confirmed reliably produces a correctly-sized chart. This
+    # sidesteps relying on Plotly/ResizeObserver picking up a CSS-driven
+    # container resize on its own, which proved unreliable across devices.
+    dcc.Interval(id="viewport-poll", interval=600, n_intervals=0),
+    dcc.Store(id="viewport-tick", data=""),
+
     html.Div([
         html.Div([
             html.Span(
@@ -404,11 +414,11 @@ app.layout = html.Div([
 
             html.Div([
                 html.Div(id="summary-row", style={"marginBottom":"12px"}),
-                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndvi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6),
-                         dbc.Col(dcc.Graph(id="chart-bsi",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6)],
+                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndvi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6),
+                         dbc.Col(dcc.Graph(id="chart-bsi",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6)],
                         className="g-2 mb-2"),
-                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndmi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6),
-                         dbc.Col(dcc.Graph(id="chart-nbr",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=6)],
+                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndmi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6),
+                         dbc.Col(dcc.Graph(id="chart-nbr",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6)],
                         className="g-2"),
             ], className="app-content"),
         ], className="app-main"),
@@ -571,8 +581,8 @@ def update_summary(aoi_value, _r=None):
 
 def make_chart_callback(key, chart_id):
     @callback(Output(chart_id,"figure"), Input("aoi-dropdown","value"),
-              Input("refresh-store","data"))
-    def _cb(aoi_value, _r=None, _key=key):
+              Input("refresh-store","data"), Input("viewport-tick","data"))
+    def _cb(aoi_value, _r=None, _vp=None, _key=key):
         parsed = parse_sel(aoi_value)
         if not parsed:
             return go.Figure()
@@ -588,6 +598,25 @@ def make_chart_callback(key, chart_id):
 for _key, _id in [("ndvi","chart-ndvi"),("bsi","chart-bsi"),
                    ("ndmi","chart-ndmi"),("nbr","chart-nbr")]:
     make_chart_callback(_key, _id)
+
+
+# Detects real viewport-size changes (e.g. orientation rotation) and
+# only writes to the store when the size actually changed, so we don't
+# re-trigger the chart callbacks every 600ms for no reason.
+app.clientside_callback(
+    """
+    function(n_intervals, current) {
+        const key = window.innerWidth + "x" + window.innerHeight;
+        if (current === key) {
+            return window.dash_clientside.no_update;
+        }
+        return key;
+    }
+    """,
+    Output("viewport-tick", "data"),
+    Input("viewport-poll", "n_intervals"),
+    State("viewport-tick", "data"),
+)
 
 
 

@@ -1,12 +1,5 @@
 /* ── Layout shells (replace the old inline SIDEBAR/MAIN style dicts) ── */
 
-button {
-  font-family: inherit;
-  box-sizing: border-box;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -21,7 +14,7 @@ button {
   padding: 10px 20px;
   background: rgba(255, 255, 255, 1);
   border-bottom: 1px solid rgba(232, 231, 226, 1);
-  min-height: 44px;  
+  height: 44px;
 }
 
 .app-header-right {
@@ -58,7 +51,7 @@ button {
 }
 
 .app-map-wrap {
-  height: 360px;
+  height: 280px;
   position: relative;
 }
 
@@ -78,7 +71,12 @@ button {
   .app-sidebar {
     width: 100%;
     min-width: 0;
-    max-height: 42vh;      /* keep sidebar from eating the whole screen */
+    /* No max-height here: capping this clipped status/metrics/download
+       content out of view inside its own scroll region, which read as
+       "components disappearing" in portrait. Let it take its natural
+       height and scroll as part of the single page scroll instead
+       (app-body below already sets overflow-y: auto for that). */
+    overflow-y: visible;
     border-right: none;
     border-bottom: 1px solid rgba(232, 231, 226, 1);
   }
@@ -88,7 +86,7 @@ button {
   }
 
   .app-map-wrap {
-    height: 240px;
+    height: 200px;
   }
 
   .app-header {
