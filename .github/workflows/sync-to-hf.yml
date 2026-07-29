@@ -17,7 +17,7 @@ jobs:
 
       - name: Build HF-only tree
         run: |
-          mkdir -p /tmp/hf_deploy/scripts
+          mkdir -p /tmp/hf_deploy/
           cp -r app.py requirements-dashboard.txt assets /tmp/hf_deploy/
           cp README.hf.md /tmp/hf_deploy/README.md   # <-- HF-specific README with front matter
           cp Dockerfile /tmp/hf_deploy/
