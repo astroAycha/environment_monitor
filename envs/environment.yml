@@ -43,6 +43,7 @@ dependencies:
   # --- Pip-only packages (conda-forge doesn't package these well) ---
   - pip
   - pip:
+    - -r ../requirements-dashboard.txt
     - mlflow==3.11.1
     - apache-airflow
     - sktime==0.40.1
