@@ -1,9 +1,9 @@
 # Environmental Monitor
 
-A geospatial MLOps dashboard for monitoring spectral indices derived from
-Sentinel-2 satellite imagery. Displays time series of NDVI, BSI, NDMI, and NBR
-for registered areas of interest (AOIs), with XGBoost forecasts and model
+A geospatial ML pipeline for monitoring and forecasting spectral indices derived from Sentinel-2 satellite imagery. 
+The time series of NDVI, BSI, NDMI, and NBR are computed and stored as parquet files in S3. A web app hosted on Hugging Face Spaces visualizes the time series for registered areas of interest (AOIs), with XGBoost forecasts and model
 metrics.
+Please follow this link to view the [dashboard](https://aychatammour.com/environmental_monitor_webapp.html).
 
 ## Architecture
 
@@ -35,21 +35,20 @@ Hugging Face Spaces (always on)
 from scripts.pipeline import Pipeline
 
 p = Pipeline(country="syria", aoi_name="Aleppo", bbox=[...])
-p.run(lat=36.2021, lon=37.1343, rad=100)
+p.run(lat=36.2021, lon=37.1343, rad=1000)
 ```
 
-The AOI is registered in `s3://environment-monitor/aois.json` and will appear in the
-dashboard dropdown on next page load. Future pipeline runs will include it
+The AOI is registered in `s3://environment-monitor/aois.json` and will appear in the dashboard dropdown on next page load. Future pipeline runs will include it
 automatically.
 
 ## Environment variables (set as Space secrets)
 
 | Variable | Description |
 |----------|-------------|
-| `AWS_ACCESS_KEY_ID` | IAM user key with S3 read access on `environment-monitor` |
+| `AWS_ACCESS_KEY_ID` | IAM user access key |
 | `AWS_SECRET_ACCESS_KEY` | Corresponding secret |
 | `AWS_DEFAULT_REGION` | e.g. `us-east-1` |
-| `BUCKET_NAME` | S3 bucket name (default: `environment-monitor`) |
+| `BUCKET_NAME` | S3 bucket name |
 
 ## Local development
 
