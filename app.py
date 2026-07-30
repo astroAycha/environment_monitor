@@ -456,7 +456,7 @@ def populate_dropdown(_):
 def update_map(aoi_value, _r=None):
     parsed = parse_sel(aoi_value)
     if not parsed:
-        return [33.5,36.3], 13, []
+        return [33.5,36.3], 10, []
     country, aoi_name = parsed
     meta = {}
     for a in load_aois().get(country, []):
@@ -464,14 +464,14 @@ def update_map(aoi_value, _r=None):
             meta = a
             break
     if not meta or "bbox" not in meta:
-        return [33.5,36.3], 13, []
+        return [33.5,36.3], 10, []
     bbox     = meta["bbox"]
     lat, lon = bbox_center(bbox)
     polygon  = {"type":"Feature","geometry":{"type":"Polygon","coordinates":[[
 
         [bbox[0],bbox[1]],[bbox[2],bbox[1]],[bbox[2],bbox[3]],[bbox[0],bbox[3]],[bbox[0],bbox[1]]
     ]]},"properties":{"name":aoi_name}}
-    return ([lat,lon], 14,
+    return ([lat,lon], 10,
             [dl.GeoJSON(data=polygon, style={"color":"rgba(24, 95, 165, 1)","weight":2,"fillOpacity":0.08,"dashArray":"6 4"}),
              dl.Marker(position=[lat,lon], children=dl.Tooltip(aoi_name))])
 
