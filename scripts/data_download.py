@@ -36,6 +36,10 @@ logging.basicConfig(
 
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
+class NoNewDataError(Exception):
+    """Raised when a STAC search returns zero items 
+    Needed to avoid a pipeline failure."""
+    pass
 
 class DataDownload():
     """
@@ -210,7 +214,7 @@ class DataDownload():
         print(f"Found {len(item_collection.items)} items in the STAC catalog.")
 
         if len(item_collection.items) == 0:
-            raise ValueError("No data found for the given parameters.")
+            raise NoNewDataError("No data found for the given parameters.")
 
         ds = odc.stac.load(item_collection,
                            bands=dataset_bands,
