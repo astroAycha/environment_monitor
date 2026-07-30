@@ -16,6 +16,7 @@ import sys
 
 from scripts.pipeline import Pipeline
 from scripts.read_bucket import DataReader
+from scripts.data_download import NoNewDataError
 
 
 os.makedirs("logs", exist_ok=True)
@@ -72,6 +73,7 @@ def main():
     log.info("Starting pipeline run for %d AOI(s).", len(all_aois))
 
     failed = []
+    skipped = []
     for country, aoi in all_aois:
         aoi_name = aoi["aoi_name"]
         log.info("── %s / %s ────────────", country, aoi_name)
@@ -87,6 +89,9 @@ def main():
                 rad=aoi.get("radius_m"),
             )
             log.info("✓  %s completed successfully.", aoi_name)
+        except NoNewDataError as e:
+            log.warning("⚠  %s skipped: %s", aoi_name, e)
+            skipped.append(aoi_name)
         except Exception as e:
             log.error("✗  %s failed: %s", aoi_name, e, exc_info=True)
             failed.append(aoi_name)
@@ -94,6 +99,8 @@ def main():
     if failed:
         log.error("Pipeline finished with %d failure(s): %s", len(failed), failed)
         sys.exit(1)
+    elif skipped:
+        log.info("All AOIs completed (%d skipped, no new data).", len(skipped))
     else:
         log.info("All AOIs completed successfully.")
 
