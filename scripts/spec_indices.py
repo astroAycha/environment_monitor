@@ -118,3 +118,51 @@ class SpectralIndices:
         print("Calculating Normalized Difference Built-Up Index (NDBI)...")
         denominator = rededge2 + rededge1
         return xr.where(denominator != 0, (rededge2 - rededge1) / denominator, np.nan)
+
+    @staticmethod
+    def calc_ndwi(nir, swir1):
+        """
+        Calculate Normalized Difference Water Index
+        (B08 - B11) / (B08 + B11)
+
+        Parameters
+        ----------
+        nir: xarray.DataArray
+            Near-infrared band data array B08
+        swir1: xarray.DataArray
+            Short-wave infrared band data array B11
+
+        Returns
+        -------
+        ndwi : xarray.DataArray
+            NDWI data array
+        """
+
+        print("Calculating Normalized Difference Water Index (NDWI)...")
+        denominator = nir + swir1
+        return xr.where(denominator != 0, (nir - swir1) / denominator, np.nan)
+
+    @staticmethod
+    def calc_vci(ndvi):
+        """
+        Calculate the Vegetation Condition Index (VCI)
+        (NDVI - NDVI_min) / (NDVI_max - NDVI_min)
+
+        Parameters
+        ----------
+        ndvi: xarray.DataArray
+            Normalized Difference Vegetation Index data array
+
+        Returns
+        -------
+        vci : xarray.DataArray
+            VCI data array
+        """
+
+        print("Calculating Vegetation Condition Index (VCI)...")
+        ndvi_min = ndvi.min(dim='time')
+        ndvi_max = ndvi.max(dim='time')
+
+        denominator = ndvi_max - ndvi_min
+        return xr.where(denominator != 0, 
+                        (ndvi - ndvi_min) / denominator * 100, np.nan)

@@ -53,6 +53,7 @@ class DataDownload():
 
         self.data_source = data_source
         self.country = country
+        self.indx_names = ['NDVI', 'BSI', 'NDMI', 'NBR', 'NDWI', 'VCI']
 
         if self.data_source == 'hls':
             self.api_url = os.getenv("MPC_STAC_API_URL")
@@ -245,6 +246,14 @@ class DataDownload():
         nbr_mean_ts = nbr.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
         spec_indices_ts.append(nbr_mean_ts)
 
+        ndwi = SpectralIndices.calc_ndwi(nir_masked, swir1_masked)
+        ndwi_mean_ts = ndwi.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
+        spec_indices_ts.append(ndwi_mean_ts)
+
+        vci = SpectralIndices.calc_vci(ndvi_mean_ts)
+        vci_mean_ts = vci.groupby("time.week").mean(dim=['x', 'y']).interp(method='nearest')
+        spec_indices_ts.append(vci_mean_ts)
+
         results = dask.compute(*spec_indices_ts, scheduler="threads",
                                num_workers=4,
                                threads_per_worker=2)
@@ -255,7 +264,9 @@ class DataDownload():
             'ndvi': results[0].data,
             'bsi': results[1].data,
             'ndmi': results[2].data,
-            'nbr': results[3].data
+            'nbr': results[3].data,
+            'ndwi': results[4].data,
+            'vci': results[5].data
         })
 
         results_df['aoi_name'] = aoi_name
@@ -269,15 +280,18 @@ class DataDownload():
         logging.info("%s", datetime.date.today().strftime("%Y-%m-%d"))
         logging.info("Extracted time series for AOI: %s, %s", aoi_name, aoi_bbox)
 
+        
         # Summarize the indices data for logging
         indices_summary = pd.DataFrame({
-            'Index': ['NDVI', 'BSI', 'NDMI', 'NBR'],
-            'Records': [indices_gdf.shape[0]] * 4,
+            'Index': self.indx_names,
+            'Records': [indices_gdf.shape[0]] * len(self.indx_names ),
             'Missing Values': [
                 indices_gdf['ndvi'].isna().sum(),
                 indices_gdf['bsi'].isna().sum(),
                 indices_gdf['ndmi'].isna().sum(),
-                indices_gdf['nbr'].isna().sum()
+                indices_gdf['nbr'].isna().sum(),
+                indices_gdf['ndwi'].isna().sum(),
+                indices_gdf['vci'].isna().sum()
             ]
         })
 
