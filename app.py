@@ -5,22 +5,6 @@ sys.stdout = sys.__stdout__  # force unbuffered output in HF Spaces container
 """
 Environmental Monitoring Dashboard — Dash app for Hugging Face Spaces.
 Reads directly from S3 via DuckDB per callback. No dcc.Store serialisation.
-
-Mobile-responsiveness notes (2026-07):
-- Layout shells (header/sidebar/main/map wrapper) moved from inline style
-  dicts to CSS classes in assets/custom.css, since inline styles can't
-  hold @media queries.
-- Chart and stat-card columns now use responsive dbc.Col breakpoints
-  (xs=/sm=/md=) instead of a single fixed `width=`, so they stack on
-  phones and grid on desktop.
-- Header now carries a title + subtitle block. Fixed: a stray unclosed
-  html.Div([ was wrapping the header+body, causing a SyntaxError; removed
-  it since header/body can be direct children of the shell div. Also
-  gave the Refresh button an explicit fontFamily/box-sizing reset inline
-  (in addition to the same reset in custom.css) since <button> elements
-  don't inherit font-family by default — without it the button renders
-  in the browser's system font instead of IBM Plex Sans, which reads
-  larger/heavier than the title even at a smaller font-size.
 """
 
 import json
@@ -50,6 +34,8 @@ INDICES = {
     "bsi":  {"label": "BSI",  "color": "rgba(186, 117, 23, 1)", "description": "Bare Soil Index"},
     "ndmi": {"label": "NDMI", "color": "rgba(55, 138, 221, 1)", "description": "Normalized Difference Moisture Index"},
     "nbr":  {"label": "NBR",  "color": "rgba(216, 90, 48, 1)", "description": "Normalized Burn Ratio"},
+    "ndwi": {"label": "NDWI", "color": "rgba(41, 128, 185, 1)", "description": "Normalized Difference Water Index (canopy)"},
+    "vci":  {"label": "VCI",  "color": "rgba(142, 68, 173, 1)", "description": "Vegetation Condition Index"},
 }
 
 TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -92,7 +78,10 @@ def read_ts(country, aoi_name):
             buf = io.BytesIO(
                 s3_client.get_object(Bucket=BUCKET, Key=obj["Key"])["Body"].read()
             )
-            tbl = pq.read_table(buf, columns=["time", "ndvi", "bsi", "ndmi", "nbr", "aoi_name"])
+            tbl = pq.read_table(
+                buf,
+                columns=["time", "ndvi", "bsi", "ndmi", "nbr", "ndwi", "vci", "aoi_name"],
+            )
             dfs.append(tbl.to_pandas())
         if not dfs:
             return pd.DataFrame()
@@ -103,7 +92,7 @@ def read_ts(country, aoi_name):
                 .reset_index(drop=True))
         df["time"] = pd.to_datetime(df["time"])
         print(f"read_ts OK: {df.shape}")
-        return df[["time", "ndvi", "bsi", "ndmi", "nbr"]]
+        return df[["time", "ndvi", "bsi", "ndmi", "nbr", "ndwi", "vci"]]
     except Exception as e:
         print(f"read_ts error: {e}")
         traceback.print_exc()
@@ -419,6 +408,9 @@ app.layout = html.Div([
                         className="g-2 mb-2"),
                 dbc.Row([dbc.Col(dcc.Graph(id="chart-ndmi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6),
                          dbc.Col(dcc.Graph(id="chart-nbr",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6)],
+                        className="g-2 mb-2"),
+                dbc.Row([dbc.Col(dcc.Graph(id="chart-ndwi", config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6),
+                         dbc.Col(dcc.Graph(id="chart-vci",  config={"displayModeBar":False, "responsive":True}), xs=12, sm=12, md=12, lg=6)],
                         className="g-2"),
             ], className="app-content"),
         ], className="app-main"),
@@ -596,7 +588,8 @@ def make_chart_callback(key, chart_id):
         )
 
 for _key, _id in [("ndvi","chart-ndvi"),("bsi","chart-bsi"),
-                   ("ndmi","chart-ndmi"),("nbr","chart-nbr")]:
+                   ("ndmi","chart-ndmi"),("nbr","chart-nbr"),
+                   ("ndwi","chart-ndwi"),("vci","chart-vci")]:
     make_chart_callback(_key, _id)
 
 
