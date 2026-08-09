@@ -5,25 +5,10 @@ sys.stdout = sys.__stdout__  # force unbuffered output in HF Spaces container
 """
 Environmental Monitoring Dashboard — Dash app for Hugging Face Spaces.
 Reads directly from S3 via DuckDB per callback. No dcc.Store serialisation.
-
-Mobile-responsiveness notes (2026-07):
-- Layout shells (header/sidebar/main/map wrapper) moved from inline style
-  dicts to CSS classes in assets/custom.css, since inline styles can't
-  hold @media queries.
-- Chart and stat-card columns now use responsive dbc.Col breakpoints
-  (xs=/sm=/md=) instead of a single fixed `width=`, so they stack on
-  phones and grid on desktop.
-- Header now carries a title + subtitle block. Fixed: a stray unclosed
-  html.Div([ was wrapping the header+body, causing a SyntaxError; removed
-  it since header/body can be direct children of the shell div. Also
-  gave the Refresh button an explicit fontFamily/box-sizing reset inline
-  (in addition to the same reset in custom.css) since <button> elements
-  don't inherit font-family by default — without it the button renders
-  in the browser's system font instead of IBM Plex Sans, which reads
-  larger/heavier than the title even at a smaller font-size.
 """
 
 import json
+import re
 import traceback
 from datetime import date
 
@@ -40,7 +25,7 @@ load_dotenv()
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-BUCKET     = os.getenv("S3_BUCKET_NAME", "environment-monitor")
+BUCKET     = os.getenv("S3_BUCKET_NAME", "")
 REGION     = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 KEY_ID     = os.getenv("AWS_ACCESS_KEY_ID", "")
 KEY_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY", "")
@@ -166,14 +151,24 @@ def read_metrics(country, aoi_name):
         print(f"read_metrics error: {e}")
         return {}
 
-def parse_sel(aoi_value):
-    if not aoi_value:
+def parse_sel(country, aoi_name):
+    if not country or not aoi_name:
         return None
-    sel = json.loads(aoi_value)
-    return sel["country"], sel["aoi_name"]
+    return country, aoi_name
 
 def bbox_center(bbox):
     return (bbox[1] + bbox[3]) / 2, (bbox[0] + bbox[2]) / 2
+
+
+def format_menu_label(value):
+    """Format raw identifiers into readable title-cased menu labels."""
+    if value is None:
+        return ""
+    label = re.sub(r"[_-]+", " ", str(value)).strip()
+    words = []
+    for w in label.split():
+        words.append(w.upper() if w.isalpha() and len(w) <= 3 else w.capitalize())
+    return " ".join(words)
 
 # ── Chart builder ──────────────────────────────────────────────────────────────
 
@@ -334,10 +329,26 @@ app.layout = html.Div([
 
     html.Div([
         html.Div([
-            html.Div([html.Div("Area of interest", style=SEC),
-                      dcc.Dropdown(id="aoi-dropdown", options=[], value=None,
-                                   clearable=False, placeholder="Loading AOIs...",
-                                   style={"fontSize":"13px"})]),
+            html.Div([
+                html.Div("Country", style=SEC),
+                dcc.Dropdown(
+                    id="country-dropdown",
+                    options=[],
+                    value=None,
+                    clearable=False,
+                    placeholder="Loading Countries...",
+                    style={"fontSize":"13px", "marginBottom":"8px"},
+                ),
+                html.Div("Area of interest", style=SEC),
+                dcc.Dropdown(
+                    id="aoi-dropdown",
+                    options=[],
+                    value=None,
+                    clearable=False,
+                    placeholder="Select a Country First...",
+                    style={"fontSize":"13px"},
+                ),
+            ]),
             html.Div([html.Div("Pipeline status",  style=SEC), html.Div(id="status-panel")]),
             html.Div([html.Div("Model metrics",    style=SEC), html.Div(id="metrics-panel")]),
             html.Div([html.Div("Index statistics", style=SEC), html.Div(id="stats-panel")]),
@@ -441,23 +452,47 @@ def handle_refresh(n_clicks):
     return n_clicks, f"Last refreshed: {now}"
 
 
-@callback(Output("aoi-dropdown","options"), Output("aoi-dropdown","value"),
-          Input("aoi-dropdown","id"))
-def populate_dropdown(_):
+@callback(
+    Output("country-dropdown", "options"),
+    Output("country-dropdown", "value"),
+    Input("country-dropdown", "id"),
+)
+def populate_countries(_):
     registry = load_aois()
-    opts = [{"label": f"{a['aoi_name']} ({c})",
-             "value": json.dumps({"country": c, "aoi_name": a["aoi_name"]})}
-            for c, aois in registry.items() for a in aois]
+    opts = [{"label": format_menu_label(c), "value": c} for c in sorted(registry.keys())]
     return opts, (opts[0]["value"] if opts else None)
 
 
-@callback(Output("aoi-map","center"), Output("aoi-map","zoom"), Output("map-layers","children"),
-          Input("aoi-dropdown","value"), Input("refresh-store","data"))
-def update_map(aoi_value, _r=None):
-    parsed = parse_sel(aoi_value)
+@callback(
+    Output("aoi-dropdown", "options"),
+    Output("aoi-dropdown", "value"),
+    Input("country-dropdown", "value"),
+    Input("refresh-store", "data"),
+    State("aoi-dropdown", "value"),
+)
+def populate_aois(country, _r=None, current_aoi=None):
+    if not country:
+        return [], None
+    registry = load_aois()
+    opts = [{"label": format_menu_label(a["aoi_name"]), "value": a["aoi_name"]}
+            for a in registry.get(country, [])]
+    if current_aoi and any(o["value"] == current_aoi for o in opts):
+        return opts, current_aoi
+    return opts, (opts[0]["value"] if opts else None)
+
+
+@callback(
+    Output("aoi-map", "center"),
+    Output("aoi-map", "zoom"),
+    Output("map-layers", "children"),
+    Input("country-dropdown", "value"),
+    Input("aoi-dropdown", "value"),
+    Input("refresh-store", "data"),
+)
+def update_map(country, aoi_name, _r=None):
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return [33.5,36.3], 10, []
-    country, aoi_name = parsed
     meta = {}
     for a in load_aois().get(country, []):
         if a["aoi_name"] == aoi_name:
@@ -476,12 +511,16 @@ def update_map(aoi_value, _r=None):
              dl.Marker(position=[lat,lon], children=dl.Tooltip(aoi_name))])
 
 
-@callback(Output("status-panel","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
-def update_status(aoi_value, _r=None):
-    parsed = parse_sel(aoi_value)
+@callback(
+    Output("status-panel", "children"),
+    Input("country-dropdown", "value"),
+    Input("aoi-dropdown", "value"),
+    Input("refresh-store", "data"),
+)
+def update_status(country, aoi_name, _r=None):
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
-    country, aoi_name = parsed
     rows    = []
     ts_df   = read_ts(country, aoi_name)
     if not ts_df.empty:
@@ -500,12 +539,16 @@ def update_status(aoi_value, _r=None):
     return html.Div(rows)
 
 
-@callback(Output("metrics-panel","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
-def update_metrics(aoi_value, _r=None):
-    parsed = parse_sel(aoi_value)
+@callback(
+    Output("metrics-panel", "children"),
+    Input("country-dropdown", "value"),
+    Input("aoi-dropdown", "value"),
+    Input("refresh-store", "data"),
+)
+def update_metrics(country, aoi_name, _r=None):
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
-    country, aoi_name = parsed
     metrics = read_metrics(country, aoi_name)
     if not metrics:
         return html.Div("No metrics available.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
@@ -522,12 +565,16 @@ def update_metrics(aoi_value, _r=None):
                               style={"fontSize":"11px","color":"rgba(170, 170, 170, 1)","marginTop":"6px"})])
 
 
-@callback(Output("stats-panel","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
-def update_stats(aoi_value, _r=None):
-    parsed = parse_sel(aoi_value)
+@callback(
+    Output("stats-panel", "children"),
+    Input("country-dropdown", "value"),
+    Input("aoi-dropdown", "value"),
+    Input("refresh-store", "data"),
+)
+def update_stats(country, aoi_name, _r=None):
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return html.Div("Select an AOI.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
-    country, aoi_name = parsed
     ts_df = read_ts(country, aoi_name)
     if ts_df.empty:
         return html.Div("No data.", style={"color":"rgba(136, 136, 136, 1)","fontSize":"12px"})
@@ -548,12 +595,16 @@ def update_stats(aoi_value, _r=None):
     return html.Div(rows)
 
 
-@callback(Output("summary-row","children"), Input("aoi-dropdown","value"), Input("refresh-store","data"))
-def update_summary(aoi_value, _r=None):
-    parsed = parse_sel(aoi_value)
+@callback(
+    Output("summary-row", "children"),
+    Input("country-dropdown", "value"),
+    Input("aoi-dropdown", "value"),
+    Input("refresh-store", "data"),
+)
+def update_summary(country, aoi_name, _r=None):
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return dbc.Row([])
-    country, aoi_name = parsed
     ts_df   = read_ts(country, aoi_name)
     fc_df   = read_forecasts(country, aoi_name)
     metrics = read_metrics(country, aoi_name)
@@ -580,13 +631,17 @@ def update_summary(aoi_value, _r=None):
 
 
 def make_chart_callback(key, chart_id):
-    @callback(Output(chart_id,"figure"), Input("aoi-dropdown","value"),
-              Input("refresh-store","data"), Input("viewport-tick","data"))
-    def _cb(aoi_value, _r=None, _vp=None, _key=key):
-        parsed = parse_sel(aoi_value)
+    @callback(
+        Output(chart_id, "figure"),
+        Input("country-dropdown", "value"),
+        Input("aoi-dropdown", "value"),
+        Input("refresh-store", "data"),
+        Input("viewport-tick", "data"),
+    )
+    def _cb(country, aoi_name, _r=None, _vp=None, _key=key):
+        parsed = parse_sel(country, aoi_name)
         if not parsed:
             return go.Figure()
-        country, aoi_name = parsed
         ts_df = read_ts(country, aoi_name)
         fc_df = read_forecasts(country, aoi_name)
         return make_chart(
@@ -625,18 +680,18 @@ app.clientside_callback(
 @callback(
     Output("download-ts", "data"),
     Input("btn-dl-ts", "n_clicks"),
+    Input("country-dropdown", "value"),
     Input("aoi-dropdown", "value"),
     prevent_initial_call=True,
 )
-def download_ts(n_clicks, aoi_value):
+def download_ts(n_clicks, country, aoi_name):
     """Download full time series as CSV."""
     from dash import ctx
-    if ctx.triggered_id != "btn-dl-ts" or not aoi_value:
+    if ctx.triggered_id != "btn-dl-ts":
         return dash.no_update
-    parsed = parse_sel(aoi_value)
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return dash.no_update
-    country, aoi_name = parsed
     ts_df = read_ts(country, aoi_name)
     if ts_df.empty:
         return dash.no_update
@@ -647,18 +702,18 @@ def download_ts(n_clicks, aoi_value):
 @callback(
     Output("download-forecast", "data"),
     Input("btn-dl-forecast", "n_clicks"),
+    Input("country-dropdown", "value"),
     Input("aoi-dropdown", "value"),
     prevent_initial_call=True,
 )
-def download_forecast(n_clicks, aoi_value):
+def download_forecast(n_clicks, country, aoi_name):
     """Download latest forecast as CSV."""
     from dash import ctx
-    if ctx.triggered_id != "btn-dl-forecast" or not aoi_value:
+    if ctx.triggered_id != "btn-dl-forecast":
         return dash.no_update
-    parsed = parse_sel(aoi_value)
+    parsed = parse_sel(country, aoi_name)
     if not parsed:
         return dash.no_update
-    country, aoi_name = parsed
     fc_df = read_forecasts(country, aoi_name)
     if fc_df.empty:
         return dash.no_update
