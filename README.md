@@ -3,7 +3,10 @@
 A geospatial ML pipeline for monitoring and forecasting spectral indices derived from Sentinel-2 satellite imagery. 
 The time series of NDVI, BSI, NDMI, and NBR are computed and stored as parquet files in S3. A web app hosted on Hugging Face Spaces visualizes the time series for registered areas of interest (AOIs), with XGBoost forecasts and model
 metrics.
-Please follow this link to view the [dashboard](https://aychatammour.com/environmental_monitor_webapp.html).
+
+➡️ Check out the slides from a recent presentation: [![Slides](https://img.shields.io/badge/Slides-View%20Presentation-yellow?logo=googleslides&logoColor=white)](https://docs.google.com/presentation/d/e/2PACX-1vQynE5k5LFszeyfckbCuCws1UFROcA0HxJRx_9RAfe-qxYmQEqz5trIFgWok_3To-Wpw7HxI54mVZfH/pub?start=false&loop=false&delayms=3000)
+
+➡️ View the live [dashboard](https://aychatammour.com/environmental_monitor_webapp.html).
 
 ## Architecture
 
