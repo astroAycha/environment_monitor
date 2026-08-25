@@ -1,10 +1,12 @@
 # Environmental Monitoring: An End-to-End Machine Learning Pipeline with Earth Observation Data
 
-*How a cloud-native pipeline turns petabytes of Sentinel-2 imagery into a two-week-refreshed forecast for any patch of ground on Earth.*
+*How I built a cloud-native ML pipeline for monitoring and forecasting environmental change without downloading terabytes of satellite imagery*
 
-Monitoring is a critical part of environmental management, and open-source Earth observation (EO) data has made it more accessible than ever. Anyone can pull up a satellite image of almost anywhere on the planet, going back years. The problem is what happens after that: the sheer volume of data makes storage, processing, and analysis genuinely hard to do well, especially if you want to do it more than once.
+Monitoring is a critical part of environmental management, and open-source Earth observation (EO) data has made it more accessible than ever. Anyone can pull up a satellite image of almost anywhere on the planet, going back years. The problem is what happens after that: the sheer volume of data makes storage, processing, and analysis genuinely hard to do well, especially if you want to do it more than once. I built a pipeline that automates that process: ingesting new imagery, tracking environmental indicators over time, and forecasting where conditions are headed, for any area of interest, without ever downloading a satellite tile.
 
-This is what that looks like on the ground. Two Sentinel-2 captures of the same area near Atamah, Syria, eight years apart. The stark change in the farmland is perhaps the most obvious but if you look closely, you can also see the waterbody has shrunk significantly, and the town of Atamah has now two refugee camps attached to it. Has this waterbody shrunk this year only or was it happening gradually over the years? How did the refugee camps impact the farms around the town? 
+We have two Sentinel-2 captures of the same area near Atamah, Syria, eight years apart. The imagery alone shows the change: farmland loss is most visible on the Turkish side of the border, the waterbody has shrunk noticeably, and two refugee camps near Atamah have expanded into what was previously agricultural land. Al-Danah, a nearby town that has absorbed a significant refugee population, has grown visibly over the same period. Has this waterbody shrunk this year only or was it happening gradually over the years? How did the refugee camps impact the farms around the town?
+
+Understanding why requires context the pixels alone can't provide. This is a border region that has absorbed sustained displacement from the conflict in Syria, and the settlement expansion visible here reflects that. It is not a one-off event, but a gradual pressure that has built over years. The pipeline's role is narrower than that story: it can tell you that something changed and roughly when, at the resolution of index averages over an area of interest. It can't tell you why. That's what makes it a monitoring tool rather than an analysis tool: a signal that something warrants a closer look, not a substitute for the on-the-ground knowledge needed to interpret it. 
 
 
 <img src="./images/northeast_syria_2017_2025.png"
@@ -15,11 +17,15 @@ This is what that looks like on the ground. Two Sentinel-2 captures of the same 
 
 That kind of change is exactly what environmental monitoring is meant to catch, but catching it well means answering a harder question than "can I download a satellite image." It means building a system that keeps answering that question, automatically, efficiently, and indefinitely.
 
+What would be the purpose of such a system, one may ask? Think of it as a tool used by environmental scientists, NGOs, and government agencies to track changes in land cover, vegetation health, water bodies, and other environmental indicators over time.By automatically ingesting new satellite imagery, processing it, and generating forecasts, the pipeline can provide stakeholders with timely information to support decisions about conservation, resource management, and policy. Consider a government agency, NGO, or other organization supporting farmers across a large region. If vegetation or moisture conditions are expected to deteriorate over the next several weeks, knowing that before the deterioration becomes severe could help inform where resources should be directed, which areas might warrant closer assessment, or where agricultural support may be needed.
+
+In this context, the forecast is not the decision itself. It is an additional signal that can feed into a larger resource-allocation, risk-assessment, or early-warning process. And by building it as an extensible pipeline, new areas of interest and spectral indices can be added as needed, without having to re-engineer the whole system. 
+
 ## The Challenge
 
 A single Sentinel-2 tile runs about 1 GB on average. For a one-off analysis, that is manageable; download it, crop to the area of interest, run your indices, move on. But for monitoring applications, there are new considerations to take into account. We, for instance, need to go back for new imagery on a schedule, do the reprocessing, and keep results current. And if we are tracking changes in multiple areas of interest, the challenge is now multiplied. Downloading and re-downloading gigabyte tiles does not scale, and neither does a workflow that depends on someone remembering to run it.
 
-In production, that means leaning on automation as much as possible, and designing the system around that from the start, rather than bolting it on afterward.
+For a continuously running monitoring system, that means leaning on automation as much as possible, and designing the system around that from the start, rather than bolting it on afterward.
 
 <img src="./images/sentinel2_browser_screenshot.png"
      alt="Sentinel-2 browser screenshot of the search interface"
@@ -55,25 +61,25 @@ The ingestion stage never downloads a file. Instead, it queries data where it li
 
 For a defined bounding box, the pipeline computes spectral indices: NDVI (vegetation), BSI (bare soil), NDMI (moisture), NBR (burn ratio), and reduces each scene to an average value. Those averages accumulate into a time series, which gets appended to on every run rather than recomputed from scratch:
 
-<img src="./images/cogs_raw.png"
-     alt="Raw NDVI, BSI, NDMI, and NBR time series for the COGS Lawrencetown area of interest, 2018 to 2026"
+<img src="./images/atamah_raw.png"
+     alt="Raw NDVI, BSI, NDMI, and NBR time series for the Atamah Camp area of interest, 2018 to 2026"
      width="500">
 
 *Raw index values for one AOI, 2018–2026. The seasonal cycle is visible immediately in NDVI and NBR — that structure is exactly what the forecasting stage needs to model.*
 
-The result of ingestion is not imagery, it is a handful of parquet files, a few kilobytes each, sitting in S3. That's the efficiency payoff: gigabytes of source imagery compress down to a tiny, cheap-to-store time series, and the pipeline only ever touches new scenes going forward. The schedule updates every two weeks.
+The result of ingestion is not imagery, it is a handful of parquet files, a few kilobytes each, sitting in S3. That's the efficiency payoff: instead of storing the imagery itself, the pipeline reduces each scene to a handful of summary statistics, resulting in parquet files that are only a few kilobytes each. The schedule updates every two weeks.
 
 ## Preprocessing and Forecasting
 
-Once the time series is in S3, the forecasting stage reads it back and prepares it doing the resampling, interpolation, smoothing, since raw indices are noisy and can include gaps (due to cloud mask for instance).
+Once the time series is in S3, the forecasting stage reads it back and prepares it for modeling through resampling, interpolation, and smoothing. Raw indices can be noisy and contain gaps due to cloud masking.
 
-<img src="./images/cogs_proc.png"
-     alt="Processed NDVI and NDMI time series for the COGS Lawrencetown area of interest, 2018 to 2026, showing seasonal cycles and a smoothed trend"
+<img src="./images/atamah_proc.png"
+     alt="Processed NDVI and NDMI time series for the Atamah Camp area of interest, 2018 to 2026, showing seasonal cycles and a smoothed trend"
      width="500">
 
 *Processed time series data is now ready for forecasting.*
 
-Forecasting itself runs on **XGBoost** which has a reputation of being fast and robust on structured/tabular data. For this project I use the [Nextal MLForecast library](https://nixtlaverse.nixtla.io/mlforecast/index.html) which provides a handy scikit-learn like tool to do time series forecasting including feature engineering, and cross validation. Other libraries that I also used include [Optuna](https://optuna.org) for hyperparameter tuning and [MLflow](https://mlflow.org) for experiment tracking.
+Forecasting itself runs on **XGBoost** which has a reputation of being fast and robust on structured/tabular data. For this project I use the [Nixtla MLForecast library](https://nixtlaverse.nixtla.io/mlforecast/index.html) which provides a handy scikit-learn like tool to do time series forecasting including feature engineering, and cross validation. Other libraries that I also used include [Optuna](https://optuna.org) for hyperparameter tuning and [MLflow](https://mlflow.org) for experiment tracking.
 
 
 - **Feature engineering**: this took some experimentation but I mainly used lag features, and rolling windows as well as datetime features (quarter) to capture the seasonal cycles
@@ -82,10 +88,10 @@ Forecasting itself runs on **XGBoost** which has a reputation of being fast and 
 I used a time series split with 3 folds, each fold being 12 weeks long.
 - **Experiment tracking with MLflow**: logging every parameter, metric, and artifact so the different runs can be compared and the best model can be selected for deployment.
 
-The output is a 12-week-ahead forecast with a 95% confidence interval, plotted directly against the observed history:
+The output is a 12-week-ahead forecast plotted directly against the observed history:
 
 <img src="./images/forecast_ndvi_ndmi.png"
-     alt="NDVI and NDMI forecasts with 95% confidence intervals, showing eight years of observed seasonal cycles followed by a short forecast tail"
+     alt="NDVI and NDMI forecasts showing eight years of observed seasonal cycles followed by a short forecast tail"
      width="500">
 
 *NDVI and NDMI: eight years of observed seasonal cycles feeding a 12-week forecast.*
@@ -121,15 +127,34 @@ p.run(lat=52.763, lon=-117.979, rad=4000)
 
 All the code is available on a GitHub repository with documentation, some tests (should be writing more!), and example notebooks.
 
+## Caveats and Limitations
+
+Given the pipeline reduces the AOI image data to summary statistics to create the average index time series, it is unable to detect small changes that might be lost due to averaging. Such subtle changes can be tracked by using multiple small AOIs or by using spatial information in the model. However, using multiple spectral indices (each measures a different aspect of the environment) could potentially help mitigate this limitation, as it provides a more comprehensive view of the environmental conditions (i.e., water content, build-up, etc.).
+
+Another important limitation to keep in mind is that the forecasts are only as good as the data and the model. The model is trained on historical data, and if there are sudden changes in the environment (e.g., natural disasters, human interventions), the forecasts may not be accurate. Additionally, the model's performance may vary across different AOIs due to differences in environmental conditions, data quality, and other factors. The forecasts should therefore be treated as one source of information rather than a definitive prediction of future conditions.
+
+
 ## Summary and Next Steps
 
 This project is an exercise in bringing data science methods to geospatial data properly; not just running a model once on a downloaded tile, but building a pipeline that is efficient, automated, reproducible, and extensible, and keeping it open-source and open-access throughout.
 
-The bigger lessons ended up being less about the modeling and more about the MLOps around it: what is the most efficient way to handle such large volume of data, what happens when there is no new data available for an AOI, what a poor forecast run actually looks like in the metrics before it reaches a user, and how much upkeep it takes to keep AOI information current as new areas get added. None of that shows up in a single slide about model architecture, but it's most of what running this in production actually involves.
+| Layer               | Tool               | Role                                |
+| ------------------- | ------------------ | ----------------------------------- |
+| Data discovery      | STAC               | Find imagery without downloading it |
+| Data access         | ODC/Xarray         | Load only the required pixels       |
+| Parallel processing | Dask               | Scale computation                   |
+| Storage             | S3                 | Persist time series and forecasts   |
+| Forecasting         | XGBoost/MLForecast | Predict future index values         |
+| Experiment tracking | MLflow             | Track model runs                    |
+| Automation          | GitHub Actions     | Schedule updates                    |
+| Visualization       | Dash               | Serve results                       |
+
+
+The bigger lessons ended up being less about the modeling and more about the MLOps around it: what is the most efficient way to handle such large volume of data, what happens when there is no new data available for an AOI, what a poor forecast run actually looks like in the metrics before it reaches a user, and how much upkeep it takes to keep AOI information current as new areas get added. None of that shows up in a single slide about model architecture, but it's most of what maintaining an operational ML pipeline actually involves.
 
 Ongoing maintenance, more documentation and tests, and the inevitable bugs are part of the plan, not an afterthought. If there is an area you would like to see added to the monitor, feel free to open an issue on the GitHub repository, and if you want to contribute, please do! The code is open-source and contributions are welcome.
 
-Acknowledgments: This project was completed as part of the COGS GIS-Remote Sensing graduate certificate program, with thanks to James Rapaport who served as the project mentor.
+Acknowledgments: This project was completed as part of the COGS GIS-Remote Sensing graduate certificate program.
 
 ---
 
