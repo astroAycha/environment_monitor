@@ -210,7 +210,6 @@ __marimo__/
 .DS_Store
 .vscode/
 
-*.png
 env-monitor-app_accessKeys.csv
 
 mlruns/
