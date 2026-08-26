@@ -8,6 +8,8 @@ metrics.
 
 ➡️ View the live [dashboard](https://aychatammour.com/environmental_monitor_webapp.html).
 
+➡️ Read a medium [article](https://medium.com/@aycha.tammour/environmental-monitoring-an-end-to-end-machine-learning-pipeline-with-earth-observation-data-7e83097a8a42?sharedUserId=aycha.tammour) on the project.
+
 ## Architecture
 
 ```
